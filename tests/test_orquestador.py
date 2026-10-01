@@ -55,7 +55,7 @@ async def test_pregunta_de_mercado_va_al_agente_externo(servicio):
     resultado = json.loads(falso.llamadas[1]["messages"][-1]["content"][0]["content"])
     assert resultado["confianza"] in ("HIGH", "MEDIUM", "LOW") and "USD" in resultado["precios_por_moneda"]
     kw = falso.llamadas[0]
-    assert kw["model"] == "claude-opus-5-5" and kw["fallbacks"] == "default"
+    assert kw["model"] == "claude-sonnet-5-5" and kw["fallbacks"] == "default"
     assert kw["system"][0]["cache_control"] == {"type": "ephemeral"}
     assert "GRA-010" in kw["system"][0]["text"] and "MercadoAgentico" in kw["system"][0]["text"]
     assert "[Ahora: miércoles 2026-09-30 11:30" in kw["messages"][0]["content"]

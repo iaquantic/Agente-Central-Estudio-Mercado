@@ -83,8 +83,8 @@ telegram:
   limite_consultas_hora: 30
 
 modelo:
-  nombre: claude-opus-5-5
-  esfuerzo: medium
+  nombre: claude-sonnet-5-5   # Sonnet 5.5: ~0,035 USD por pregunta. Para más calidad: claude-opus-5-5 (~0,08 USD)
+  esfuerzo: medium            # low | medium | high (más esfuerzo = mejor razonamiento y más coste)
 
 # Hora congelada: SOLO para demostraciones. En producción, null.
 demo:

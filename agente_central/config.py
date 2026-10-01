@@ -34,7 +34,7 @@ DEFECTOS: dict[str, Any] = {
                "diferencia_maxima_fiable_pct": 50},
     "telegram": {"resumen_diario": "19:45", "alertas_urgentes": True, "revisar_alertas_cada_min": 30,
                  "silencio": ["21:00", "08:00"], "max_alertas_dia": 3, "limite_consultas_hora": 30},
-    "modelo": {"nombre": "claude-opus-5-5", "esfuerzo": "medium"},
+    "modelo": {"nombre": "claude-sonnet-5-5", "esfuerzo": "medium"},
     "demo": {"ahora": None},
     "catalogo_vigilado": [],
 }

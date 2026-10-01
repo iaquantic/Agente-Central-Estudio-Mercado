@@ -9,7 +9,7 @@ Implementadas en `agente_central/cruce.py`. Todos los umbrales están en `reglas
 | Precio propio, coste medio, margen 30 d, stock, estado, cobertura | Agente Interno (`get_product`) | Tal cual |
 | Velocidad con stock | Agente Interno (`get_product_history`, semanal) | Media de unidades/día de las últimas 8 semanas completas con stock o ventas (evita que un agotado parezca "no se vende") |
 | Tendencia de unidades | Ídem | Últimas 4 semanas completas frente a las 4 anteriores |
-| Referencia de mercado (USD) | Agente Externo | Mediana por anuncio de la misma presentación, por moneda; los CUP se convierten con la tasa del día; se ponderan por nº de anuncios (**estimación**) |
+| Referencia de mercado (USD) | Agente Externo | Mediana por anuncio de la misma presentación, por moneda; los CUP se convierten con la tasa del día; se ponderan por nº de anuncios (**estimación**). Con menos de 3 anuncios de la misma presentación, precio por unidad estándar (USD/kg, USD/L…) de todas las presentaciones × cantidad del producto |
 | Banda p25–p75 | Ídem | Igual que la referencia, con los cuartiles |
 | Variación del mercado (USD) | Ídem + serie de tasas del Interno | Mediana semanal en USD equivalentes (CUP ÷ tasa de esa semana); media de las 2 primeras semanas frente a las 2 últimas |
 | Diferencia de precio | — | (precio propio − referencia) ÷ referencia |
@@ -35,7 +35,7 @@ Implementadas en `agente_central/cruce.py`. Todos los umbrales están en `reglas
 - Las propuestas se ordenan por prioridad y, dentro de cada una, por impacto.
 - Todas son **INFERENCIAS**: el panel y el bot las presentan como propuestas, nunca como hechos ni acciones.
 
-## Ejemplos (negocio de demostración, 30/9/2026)
+## Ejemplos (casos que verifican las pruebas automáticas, con mercado sintético de prueba)
 
 | Producto | Situación | Propuesta |
 |---|---|---|

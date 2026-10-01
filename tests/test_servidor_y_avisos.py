@@ -2,16 +2,14 @@ from datetime import datetime
 
 from fastapi.testclient import TestClient
 
-from agente_central.config import Config
 from agente_central.formato import filtrar, html_telegram, propuestas_html, trocear
 from agente_central.planificador import Avisador, en_silencio
-from agente_central.servicio import Servicio
 from agente_central.servidor import crear_app
-from tests.conftest import RAIZ
+from tests.conftest import cargar, crear_servicio
 
 
 def _servicio(tmp_path, **env):
-    return Servicio(Config.cargar(RAIZ / "config/empresa.demo.yaml", entorno={"DIRECTORIO_DATOS": str(tmp_path), **env}))
+    return crear_servicio(cargar(tmp_path, **env), tmp_path)
 
 
 def test_panel_web_con_token(tmp_path):

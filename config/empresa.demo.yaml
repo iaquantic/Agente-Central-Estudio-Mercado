@@ -1,4 +1,6 @@
-# Perfil de empresa del Agente Central — DEMOSTRACIÓN (negocio ficticio "MercadoAgentico").
+# Perfil de empresa del Agente Central — DEMOSTRACIÓN.
+# Negocio: "MercadoAgentico", la base de datos de prueba del Agente Interno (respuestas capturadas en demo/interno).
+# Mercado: REAL, en vivo desde Revolico y Cuballama.
 #
 # Este archivo es lo ÚNICO que cambia de una empresa a otra. Para un cliente nuevo:
 #   cp config/empresa.demo.yaml config/empresa.yaml   (y EMPRESA_CONFIG=config/empresa.yaml)
@@ -40,16 +42,15 @@ interno:
 # Agente Externo (Controlador de Mercado)
 mercado:
   modo: motor                 # motor (análisis determinista, sin coste de modelo) | agente (el externo usa Claude)
+  # Datos reales, consultados en vivo. Cada ejecución guarda sus capturas (CONTROLADOR_CACHE_DIR) y con ellas se
+  # calculan las tendencias, que aparecen a partir de 3 semanas con al menos una captura semanal.
   fuentes:
-    - tipo: archivo           # archivo | web
-      ruta: demo/mercado/observaciones
-    # Fuentes reales (activar en producción; ver condiciones de uso en el README del Controlador de Mercado):
-    # - tipo: web
-    #   nombre: revolico
-    # - tipo: web
-    #   nombre: cuballama
-    # - tipo: web
-    #   nombre: cubamax
+    - tipo: web
+      nombre: revolico
+      opciones: {max_pages: 3}
+    - tipo: web
+      nombre: cuballama
+      opciones: {default_province: La Habana, channels: [mercado, envios]}
   provincias: []              # vacío = todas; p. ej. [La Habana]
   convertir_a: USD            # se convierte con la tasa elTOQUE que informa el Agente Interno
   granularidad: week
@@ -70,6 +71,7 @@ reglas:
   variacion_tendencia_pct: 8   # variación del precio de mercado que se considera movimiento
   cobertura_minima_dias: 7     # cobertura por debajo de la cual hay riesgo de rotura
   dias_horizonte: 30           # horizonte para estimar el impacto económico
+  diferencia_maxima_fiable_pct: 50   # más diferencia con el mercado = búsqueda dudosa, no se propone nada
 
 telegram:
   resumen_diario: "19:45"      # null para desactivar
@@ -83,7 +85,8 @@ modelo:
   nombre: claude-opus-5-5
   esfuerzo: medium
 
-# Modo demo: hora congelada para que todo sea reproducible (null en producción)
+# Hora congelada del NEGOCIO de demostración (sus datos terminan el 30/9/2026). El mercado usa siempre la hora real.
+# En producción: null.
 demo:
   ahora: "2026-09-30T11:30:00-04:00"
 
@@ -94,16 +97,16 @@ catalogo_vigilado:
   - sku: GRA-010
     mercado: {name: aceite de girasol, quantity: 1, unit: L, exclude_keywords: [motor]}
   - sku: GRA-012
-    mercado: {name: leche en polvo, quantity: 1, unit: kg, exclude_keywords: [condensada, evaporada]}
+    mercado: {name: leche en polvo, quantity: 1, unit: kg, exclude_keywords: [condensada, evaporada, cafe, combo, pollo]}
   - sku: GRA-013
-    mercado: {name: cafe molido, quantity: 250, unit: g, exclude_keywords: [cafetera]}
+    mercado: {name: cafe, quantity: 250, unit: g, exclude_keywords: [cafetera, greca, maquina, taza, leche, azucar, combo]}
   - sku: GRA-014
-    mercado: {name: huevos, pack_count: 30, exclude_keywords: [codorniz]}
+    mercado: {name: huevos, pack_count: 30, exclude_keywords: [codorniz, sorpresa, kinder, chocolate, pollo, res, pan, aceite, hamburguesas, cajones, cajas, marmol, pascua]}
   - sku: GRA-001
-    mercado: {name: arroz, quantity: 1, unit: kg, exclude_keywords: [arrocera, pollo]}
+    mercado: {name: arroz, quantity: 1, unit: kg, exclude_keywords: [arrocera, pollo, frijoles, contenedor, res, combo, aceite]}
   - sku: CAR-001
-    mercado: {name: pollo troceado, quantity: 10, unit: lb, exclude_keywords: [combo]}
+    mercado: {name: pollo, quantity: 10, unit: lb, exclude_keywords: [arroz, frijoles, asado, chiflado, marinado, salchicha, res, cerdo, pescado, huevos, combo]}
   - sku: CLI-001
-    mercado: {name: ventilador pedestal, keywords: ["18"], exclude_keywords: [recargable, techo, mesa]}
+    mercado: {name: ventilador pedestal, keywords: ["18"], exclude_keywords: [recargable, techo, mesa, pared]}
   - sku: ELE-003
-    mercado: {name: freidora de aire, quantity: 5, unit: L}
+    mercado: {name: freidora de aire, quantity: 5, unit: L, exclude_keywords: [aceite, sandwichera]}

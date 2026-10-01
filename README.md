@@ -27,11 +27,12 @@ Detalle en [docs/arquitectura.md](docs/arquitectura.md).
 
 ## Qué hace
 
-**Panel** ([ejemplo con datos de demostración](docs/panel_demo.html)), con la identidad visual de Quantic y personalizable por empresa:
+**Panel** ([ejemplo: negocio de prueba con mercado real](docs/panel_demo.html)), con la identidad visual de Quantic y personalizable por empresa:
 - Indicadores del mes: ventas netas y variación, margen bruto, ticket medio, ventas de hoy frente a lo esperado, alertas y dinero inmovilizado.
 - **Decisiones propuestas** priorizadas, con evidencia e impacto estimado en USD (reponer, subir o bajar precio, liquidar, revisar coste).
 - **Tu precio frente al mercado** por producto vigilado (mediana y rango central de los anuncios).
 - **Tendencia de precios en el mercado** en USD equivalentes (los precios en CUP se deflactan con la tasa de cada semana).
+  Se construye con las capturas que se guardan en cada análisis: aparece a partir de varias semanas de uso.
 - Ventas de 12 meses, más y menos vendidos, más y menos rentables, categorías, tasa USD→CUP, inventario y alertas.
 - Calidad de los datos, fuentes y límites del análisis.
 
@@ -47,7 +48,7 @@ Detalle en [docs/arquitectura.md](docs/arquitectura.md).
 - Cada afirmación lleva su tipo de evidencia (📊 dato · 💡 inferencia/propuesta · ❔ no disponible) y la confianza del mercado.
 - Solo lectura: ningún agente cambia precios, stock ni pedidos. El Agente Central propone; el dueño decide.
 
-## Arranque rápido (demo, sin credenciales)
+## Arranque rápido (demo, sin claves)
 
 ```bash
 git clone https://github.com/iaquantic/Agente-Central-Estudio-Mercado
@@ -57,13 +58,15 @@ pip install -e ../Agente-Controlador-de-Mercado -r requirements-dev.txt
 
 python -m agente_central comprobar                     # perfil, subagentes y productos vigilados
 python -m agente_central panel --salida panel.html     # abre panel.html en el navegador
-python -m pytest                                       # 61 pruebas, sin red ni claves
+python -m pytest                                       # pruebas automáticas, sin red ni claves
 ```
 
-El modo demo usa respuestas **reales** del Agente Interno sobre el negocio ficticio *MercadoAgentico*
-([demo/interno/fixtures.json](demo/interno/fixtures.json)) y observaciones de mercado **sintéticas** generadas con
-[demo/mercado/generar_mercado_demo.py](demo/mercado/generar_mercado_demo.py). La hora está congelada en
-2026-09-30 11:30 (La Habana), así que el resultado es siempre el mismo.
+En el modo demo, el **mercado es real**: el Agente Externo consulta Revolico y Cuballama en vivo (necesita conexión;
+la primera generación del panel tarda unos minutos porque las webs se consultan con 5 s entre peticiones, y después
+se reutiliza la caché de 12 h). El **negocio** es el de prueba del Agente Interno (*MercadoAgentico*): respuestas
+capturadas de su base de datos ([demo/interno/fixtures.json](demo/interno/fixtures.json)), con la hora congelada en
+2026-09-30 11:30, porque no hay todavía un negocio real conectado. Las pruebas automáticas usan su propio mercado
+sintético (`tests/mercado_prueba.py`) para no depender de la red.
 
 Con una clave de Claude (`ANTHROPIC_API_KEY`) y un bot de Telegram:
 
@@ -113,11 +116,11 @@ reglas, horarios de los avisos y modelo. Los secretos van en `.env`. Paso a paso
 | `agente_central/servidor.py` | Web: `/panel`, `/api/panel`, `/api/panel/actualizar`, `/api/preguntar`, `/salud` |
 | `prompts/agente_central_system_prompt.md` | System prompt (plantilla por empresa) |
 | `docs/contratos/` | Esquemas JSON del contrato con el Agente Interno |
-| `demo/` | Datos de demostración reproducibles |
+| `demo/interno/` | Respuestas capturadas del Agente Interno de prueba (negocio *MercadoAgentico*) |
 | `tests/` | Pruebas automáticas (el orquestador se prueba con un cliente de Claude simulado) |
 
 ## Estado del MVP
 - ✅ Orquestación de los dos subagentes, cruce con 6 reglas, panel Quantic, bot con comandos y avisos, API web.
-- ✅ Reproducible: perfil por empresa, modo demo sin credenciales, Docker para los tres agentes, 61 pruebas.
+- ✅ Reproducible: perfil por empresa, mercado real (Revolico y Cuballama), Docker para los tres agentes, pruebas sin red.
 - ⏳ Pendiente: prueba conversacional con Claude real y Telegram real, despliegue en VPS con el Agente Interno en modo `api`,
   y activar fuentes web de mercado con la autorización de cada sitio (ver el README del Controlador de Mercado).

@@ -140,3 +140,27 @@ def test_cruzar_sin_analisis():
 def test_todas_las_propuestas_son_inferencias():
     p = reglas(_interno(estado_stock="agotado"), _mercado(12.0, var=10, señales=["SUPPLY_DECREASE"]), REGLAS)
     assert all(x["tipo_evidencia"] == "INFERENCIA" for x in p)
+
+
+def test_referencia_por_unidad_estandar_si_falta_la_presentacion():
+    a = {"product": {"presentation": {"normalized_value": {"dimension": "masa", "standard_quantity": 4.536, "standard_unit": "kg"}}},
+         "price_statistics": {"by_currency": {"USD": {
+             "presentation_price": {"n": 1, "price_median": 30.0},
+             "unit_price": {"masa": {"n": 6, "price_median": 4.0, "p25": 3.8, "p75": 4.4}}}}}}
+    r = referencia_mercado(a, 700.0)
+    assert r["por_unidad_estandar"] and r["referencia_usd"] == round(4.0 * 4.536, 2) and r["n"] == 6
+    a["price_statistics"]["by_currency"]["USD"]["presentation_price"]["n"] = 4
+    assert not referencia_mercado(a, 700.0)["por_unidad_estandar"]
+
+
+def test_diferencia_enorme_no_genera_propuestas():
+    p = reglas(_interno(precio_usd=22.0), {**_mercado(112.95), "n": 3}, {**REGLAS, "diferencia_maxima_fiable_pct": 50})
+    assert _tipos(p) == [("revisar_busqueda", "info")]
+    assert "poco fiable" in p[0]["titulo"].lower()
+
+
+def test_unidad_estandar_exige_minimo_de_anuncios():
+    a = {"product": {"presentation": {"normalized_value": {"dimension": "masa", "standard_quantity": 4.536}}},
+         "price_statistics": {"by_currency": {"USD": {"presentation_price": {"n": 0},
+                                                      "unit_price": {"masa": {"n": 2, "price_median": 25.0}}}}}}
+    assert referencia_mercado(a, 700.0)["referencia_usd"] is None

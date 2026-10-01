@@ -322,7 +322,7 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
   $("titulo").textContent = `${M.empresa.nombre} · ${M.titulo}`;
   const fx = D.tasa && D.tasa.actual;
   $("meta").innerHTML = [
-    M.demo ? '<span class="pastilla demo">Datos de demostración</span>' : "",
+    M.demo ? '<span class="pastilla demo">Negocio de demostración · mercado en vivo</span>' : "",
     `<span class="pastilla">Periodo: ${fecha(M.periodo.desde)} – ${fecha(M.periodo.hasta)}</span>`,
     fx ? `<span class="pastilla">1 USD = ${nf2.format(fx.usd_cup)} CUP · ${esc(fx.source)}</span>` : "",
     `<span class="pastilla">Actualizado ${fechaHora(M.generado)}</span>`
@@ -412,7 +412,11 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
       cont.appendChild(caja);
       const W = Math.max(200, caja.clientWidth - 28), H = 92, pad = {l: 4, r: 40, t: 8, b: 6};
       const vals = serie.map((s) => s.usd).concat(precio != null ? [precio] : []);
-      if (serie.length < 2) { caja.insertAdjacentHTML("beforeend", '<p class="nota">Sin serie suficiente.</p>'); return; }
+      if (serie.length < 2) {
+        const ref = m.referencia_usd;
+        caja.insertAdjacentHTML("beforeend", `<p class="nota">Mediana actual: <b>${usd(ref, 2)}</b> · tu precio ${usd(precio, 2)}.<br>La tendencia aparece cuando haya capturas de varias semanas (se guarda una en cada análisis).</p>`);
+        return;
+      }
       let lo = Math.min(...vals), hi = Math.max(...vals); const mg = (hi - lo) * 0.15 || hi * 0.05; lo -= mg; hi += mg;
       const X = (i) => pad.l + i * (W - pad.l - pad.r) / (serie.length - 1), Y = (val) => pad.t + (hi - val) / (hi - lo) * (H - pad.t - pad.b);
       const s = svg(W, H); s.setAttribute("data-tip-zona", "");
@@ -561,7 +565,7 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
       <div><h3>Límites del análisis</h3><ul>${[...lim].slice(0, 4).map((l) => `<li>${esc(l)}</li>`).join("")}
         <li>Las conversiones CUP↔USD usan la tasa informal de elTOQUE: son estimaciones.</li></ul>
         ${(c.avisos || []).length ? `<h3>Avisos</h3><ul>${c.avisos.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}</div>`;
-    $("pie").textContent = `${M.proveedor} · Agente Central ${M.agente_central} · Generado ${fechaHora(M.generado)} (${TZ || "hora local"})` + (M.demo ? " · Negocio y mercado de demostración: las cifras de mercado son sintéticas." : "");
+    $("pie").textContent = `${M.proveedor} · Agente Central ${M.agente_central} · Generado ${fechaHora(M.generado)} (${TZ || "hora local"})` + (M.demo ? " · Negocio de demostración (MercadoMVP); los precios de mercado son reales, capturados en vivo de las fuentes indicadas." : "");
   })();
 
   function dibujar() { tendencias(); ventasMensuales(); tasaGrafico(); }

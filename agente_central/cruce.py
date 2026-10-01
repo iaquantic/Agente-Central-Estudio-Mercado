@@ -56,18 +56,42 @@ class SerieTasa:
 
 
 # ------------------------------------------------------------------------------------- mercado
-def referencia_mercado(analisis: dict, tasa: float | None) -> dict[str, Any]:
-    """Precio de referencia del mercado en USD (mediana ponderada por nº de anuncios de cada moneda)."""
+MIN_ANUNCIOS_PRESENTACION = 3
+
+
+def _bloques(analisis: dict) -> tuple[dict, dict, dict, dict, float | None]:
+    """Bloques USD/CUP por presentación y por unidad estándar, y la cantidad estándar del producto objetivo."""
     por_moneda = ((analisis.get("price_statistics") or {}).get("by_currency")) or {}
-    usd = (por_moneda.get("USD") or {}).get("presentation_price") or {}
-    cup = (por_moneda.get("CUP") or {}).get("presentation_price") or {}
+    pres = ((analisis.get("product") or {}).get("presentation") or {}).get("normalized_value") or {}
+    dim, cant = pres.get("dimension"), pres.get("standard_quantity")
+
+    def unidad(m: str) -> dict:
+        return (((por_moneda.get(m) or {}).get("unit_price") or {}).get(dim) or {}) if dim else {}
+
+    return ((por_moneda.get("USD") or {}).get("presentation_price") or {},
+            (por_moneda.get("CUP") or {}).get("presentation_price") or {}, unidad("USD"), unidad("CUP"), cant)
+
+
+def referencia_mercado(analisis: dict, tasa: float | None) -> dict[str, Any]:
+    """Precio de referencia del mercado en USD para la presentación del negocio.
+
+    Mediana por anuncio de la misma presentación, ponderada por nº de anuncios de cada moneda. Si hay menos de
+    3 anuncios de esa presentación y más con otras presentaciones, se usa el precio por unidad estándar (USD/kg,
+    USD/L…) multiplicado por la cantidad del producto: así una caja de 40 lb sirve de referencia para una de 10 lb.
+    """
+    usd_p, cup_p, usd_u, cup_u, cant = _bloques(analisis)
+    n_pres = (usd_p.get("n") or 0) + ((cup_p.get("n") or 0) if tasa else 0)
+    n_uni = (usd_u.get("n") or 0) + ((cup_u.get("n") or 0) if tasa else 0)
+    por_unidad = (n_pres < MIN_ANUNCIOS_PRESENTACION and n_uni >= MIN_ANUNCIOS_PRESENTACION
+                  and n_uni > n_pres and bool(cant))
+    usd, cup, factor = (usd_u, cup_u, cant) if por_unidad else (usd_p, cup_p, 1.0)
     partes = []          # (n, mediana_usd, p25_usd, p75_usd)
-    if usd.get("n") and usd.get("price_median") is not None:
-        partes.append((usd["n"], usd["price_median"], usd.get("p25"), usd.get("p75")))
-    if cup.get("n") and cup.get("price_median") is not None and tasa:
-        partes.append((cup["n"], cup["price_median"] / tasa,
-                       cup["p25"] / tasa if cup.get("p25") is not None else None,
-                       cup["p75"] / tasa if cup.get("p75") is not None else None))
+    for bloque, div in ((usd, 1.0), (cup, tasa)):
+        if bloque.get("n") and bloque.get("price_median") is not None and div:
+            f = factor / div
+            partes.append((bloque["n"], bloque["price_median"] * f,
+                           bloque["p25"] * f if bloque.get("p25") is not None else None,
+                           bloque["p75"] * f if bloque.get("p75") is not None else None))
     n = sum(p[0] for p in partes)
     if not n:
         return {"referencia_usd": None, "n": 0}
@@ -78,14 +102,18 @@ def referencia_mercado(analisis: dict, tasa: float | None) -> dict[str, Any]:
         return sum(k * x for k, x in v) / tot if tot else None
 
     ref, p25, p75 = pond(1), pond(2), pond(3)
+    base = ("precio por unidad estándar de todas las presentaciones × cantidad del producto"
+            if por_unidad else "mediana por anuncio de la misma presentación")
     return {                      # la banda siempre contiene la referencia (las ponderaciones pueden diferir)
         "referencia_usd": _r(ref), "p25_usd": _r(min(p25, ref)) if p25 is not None else None,
         "p75_usd": _r(max(p75, ref)) if p75 is not None else None, "n": n,
-        "mediana_usd": usd.get("price_median"), "n_usd": usd.get("n") or 0,
-        "mediana_cup": cup.get("price_median"), "n_cup": cup.get("n") or 0,
-        "mediana_cup_en_usd": _r(cup["price_median"] / tasa) if cup.get("price_median") and tasa else None,
-        "tasa_usd_cup": tasa,
-        "base": "mediana por anuncio de la misma presentación; CUP convertidos con la tasa informal elTOQUE (estimación)",
+        "mediana_usd": _r(usd["price_median"] * factor) if usd.get("price_median") is not None else None,
+        "n_usd": usd.get("n") or 0,
+        "mediana_cup": _r(cup["price_median"] * factor, 0) if cup.get("price_median") is not None else None,
+        "n_cup": cup.get("n") or 0,
+        "mediana_cup_en_usd": _r(cup["price_median"] * factor / tasa) if cup.get("price_median") and tasa else None,
+        "tasa_usd_cup": tasa, "por_unidad_estandar": por_unidad,
+        "base": base + "; CUP convertidos con la tasa informal elTOQUE (estimación)",
     }
 
 
@@ -198,6 +226,14 @@ def reglas(interno: dict, mercado: dict, r: dict) -> list[dict]:
         return [_propuesta("sin_mercado", "info", "Sin precio de mercado comparable",
                            "El Controlador de Mercado no encontró anuncios comparables con precio en el periodo.",
                            evidencia={"anuncios": mercado.get("anuncios")})]
+    # Una diferencia enorme casi siempre significa que la búsqueda mezcla otros productos o presentaciones:
+    # no se propone nada sobre esa base.
+    if dif is not None and abs(dif) > r.get("diferencia_maxima_fiable_pct", 50):
+        return [_propuesta("revisar_busqueda", "info", "Comparación con el mercado poco fiable",
+                           f"Tu precio ({_usd(precio)}) y la referencia del mercado ({_usd(ref)}) difieren un {_p(abs(dif))}: "
+                           f"seguramente la búsqueda mezcla otros productos o presentaciones ({mercado.get('n')} anuncios "
+                           "comparables). Revisa la búsqueda de este producto en el perfil antes de decidir.",
+                           evidencia=ev)]
 
     # 1. Falta de stock con el mercado escaso o al alza
     if estado in ESTADOS_FALTA:
@@ -311,6 +347,7 @@ def cruzar(ficha: dict, semanas: list[dict], analisis: dict | None, *, fx: dict 
         "señales": [{k: s.get(k) for k in ("type", "strength", "description")} for s in analisis.get("market_signals") or []],
         "confianza": analisis.get("confidence"),
         "analysis_id": analisis.get("analysis_id"),
+        "capturado": (analisis.get("analysis_period") or {}).get("captured_at_max"),
         "fuentes": [s.get("source_name") or s.get("source_id") for s in analisis.get("sources") or [] if s.get("status") == "ok"],
         "limitaciones": analisis.get("limitations") or [],
     }

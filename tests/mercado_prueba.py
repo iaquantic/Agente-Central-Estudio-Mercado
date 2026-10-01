@@ -1,14 +1,7 @@
-"""Genera observaciones de mercado SINTÉTICAS para la demostración del Agente Central.
+"""Observaciones de mercado SINTÉTICAS solo para las pruebas automáticas (sin red y deterministas).
 
-No son datos reales del mercado cubano: sirven para ejecutar el sistema completo sin conexión a las webs.
-Las fuentes se llaman ``demo_*`` y sus URLs usan el dominio reservado ``ejemplo.invalid``, para que nunca
-se confundan con fuentes reales. El resultado es determinista (misma semilla → mismos archivos).
-
-Cada producto sigue una historia coherente con las situaciones sembradas en el negocio de demostración
-(aceite agotado con el mercado escaso, café con margen bajo y el mercado al alza, ventiladores en exceso
-con precios a la baja al acabar el verano…).
-
-    python demo/mercado/generar_mercado_demo.py
+La aplicación no las usa: el Agente Externo trabaja con fuentes reales (Revolico, Cuballama). Aquí se reproduce una
+historia coherente con el negocio de prueba para verificar el cruce y el panel de extremo a extremo.
 """
 from __future__ import annotations
 
@@ -17,7 +10,6 @@ import random
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-SALIDA = Path(__file__).resolve().parent / "observaciones"
 FIN = datetime(2026, 9, 30, 12, tzinfo=timezone.utc)
 SEMANAS = 12
 # Tasa informal USD→CUP aproximada de cada semana (para fijar los precios en CUP de los clasificados).
@@ -53,7 +45,7 @@ def _interp(a: float, b: float, t: float) -> float:
 
 def generar() -> dict[str, list[dict]]:
     rng = random.Random(2026)
-    filas: dict[str, list[dict]] = {"demo_clasificados": [], "demo_tiendas": []}
+    filas: dict[str, list[dict]] = {"prueba_clasificados": [], "prueba_tiendas": []}
     for clave, p in PRODUCTOS.items():
         for s in range(SEMANAS):
             t = s / (SEMANAS - 1)
@@ -62,7 +54,7 @@ def generar() -> dict[str, list[dict]]:
             usd = _interp(*p["precio"], t)
             for k in range(n):
                 tienda = rng.random() < p["tiendas"]
-                fuente = "demo_tiendas" if tienda else "demo_clasificados"
+                fuente = "prueba_tiendas" if tienda else "prueba_clasificados"
                 ruido = rng.uniform(-0.05, 0.05)
                 if tienda:
                     precio, moneda = round(usd * (1 + ruido) * 1.03, 2), "USD"     # las tiendas cobran algo más
@@ -85,7 +77,7 @@ def generar() -> dict[str, list[dict]]:
                 })
     # Ruido realista en la última semana: otra presentación, otro producto con nombre parecido y un precio anómalo.
     ultima = (FIN - timedelta(days=1)).isoformat()
-    filas["demo_clasificados"] += [
+    filas["prueba_clasificados"] += [
         {"listing_id": "aceite-5l", "title": "Aceite de girasol 5 litros", "seller": "mayorista_1", "province": "La Habana",
          "price": 17500, "currency": "CUP", "captured_at": ultima},
         {"listing_id": "aceite-motor", "title": "Aceite de motor 1 L", "seller": "piezas_auto", "province": "La Habana",
@@ -94,20 +86,16 @@ def generar() -> dict[str, list[dict]]:
          "price": 95000, "currency": "CUP", "captured_at": ultima},
     ]
     for fuente, rows in filas.items():
-        nombre = "Clasificados" if fuente == "demo_clasificados" else "Tiendas online"
+        nombre = "Clasificados" if fuente == "prueba_clasificados" else "Tiendas online"
         for r in rows:
             r["source_id"] = fuente
-            r["source_name"] = f"{nombre} (DEMO SINTÉTICA)"
+            r["source_name"] = f"{nombre} (PRUEBA SINTÉTICA)"
     return filas
 
 
-def main() -> None:
-    SALIDA.mkdir(parents=True, exist_ok=True)
+def escribir(directorio: Path) -> Path:
+    directorio.mkdir(parents=True, exist_ok=True)
     for fuente, rows in generar().items():
-        ruta = SALIDA / f"{fuente}.jsonl"
-        ruta.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n", encoding="utf-8")
-        print(f"{ruta}: {len(rows)} observaciones")
-
-
-if __name__ == "__main__":
-    main()
+        (directorio / f"{fuente}.jsonl").write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n",
+                                                 encoding="utf-8")
+    return directorio

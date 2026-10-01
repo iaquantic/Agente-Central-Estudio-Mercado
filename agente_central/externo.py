@@ -28,7 +28,8 @@ from .config import ruta
 from .tiempo import Reloj
 
 log = logging.getLogger(__name__)
-CACHE_INCOMPLETO_S = 15 * 60      # análisis sin precios o con fuentes caídas/vacías: reintentar pronto
+CACHE_INCOMPLETO_S = 15 * 60      # análisis pobres (pocos precios, fuentes caídas o vacías): reintentar pronto
+MIN_PRECIOS_CACHE = 5             # las webs a veces devuelven muy pocos resultados de forma puntual
 CAMPOS_PRODUCTO = ("name", "brand", "model", "variant", "quantity", "unit", "pack_count", "condition", "keywords",
                    "exclude_keywords", "provinces")
 
@@ -67,10 +68,10 @@ def limpiar_producto(producto: dict) -> dict:
 
 
 def completo(analisis: dict) -> bool:
-    """Un análisis se guarda en caché larga solo si hay precios válidos y todas las fuentes respondieron con datos."""
+    """Un análisis se guarda en caché larga solo si tiene suficientes precios válidos y todas las fuentes respondieron."""
     fuentes = analisis.get("sources") or []
     precios = (analisis.get("analysis_period") or {}).get("valid_price_observation_count") or 0
-    return precios > 0 and bool(fuentes) and all(f.get("status") == "ok" for f in fuentes)
+    return precios >= MIN_PRECIOS_CACHE and bool(fuentes) and all(f.get("status") == "ok" for f in fuentes)
 
 
 def tasas_desde_fx(fx: dict | None) -> list[ExchangeRate]:

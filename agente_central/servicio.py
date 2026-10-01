@@ -25,7 +25,10 @@ class Servicio:
         self.cfg = cfg
         self.reloj = reloj or Reloj(cfg.empresa["zona_horaria"], cfg.ahora_fija)
         self.interno = interno or crear_cliente_interno(cfg, self.reloj)
-        self.mercado = mercado or ClienteMercado(cfg, self.reloj, directorio_cache=cfg.directorio_datos / "mercado")
+        # El mercado se mide siempre en tiempo real (los anuncios son de hoy), aunque el negocio de demostración
+        # tenga la hora congelada (demo.ahora solo afecta al Agente Interno y al periodo del panel).
+        self.mercado = mercado or ClienteMercado(cfg, Reloj(cfg.empresa["zona_horaria"]),
+                                                 directorio_cache=cfg.directorio_datos / "mercado")
         self.constructor = ConstructorPanel(cfg, self.interno, self.mercado, self.reloj)
         self.registro = Registro(cfg.directorio_datos / "registro.jsonl")
         self._panel: dict | None = None

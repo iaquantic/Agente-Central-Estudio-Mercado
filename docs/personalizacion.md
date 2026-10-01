@@ -33,7 +33,7 @@ Lo que hay que cambiar está marcado con `CAMBIAR`.
 | `reglas` | Umbrales de las propuestas ([reglas_de_cruce.md](reglas_de_cruce.md)) |
 | `telegram` | Hora del resumen diario, alertas urgentes, silencio nocturno, máximo diario, límite de consultas |
 | `modelo` | Modelo de Claude y esfuerzo |
-| `demo.ahora` | **`null` en producción** (si no, la hora queda congelada) |
+| `demo.ahora` | **`null` en producción** (congela la hora del negocio; el mercado siempre usa la hora real) |
 
 ### Catálogo vigilado
 

@@ -30,7 +30,7 @@ docker compose exec agente-central python -m agente_central comprobar
 - Cubamax necesita Chromium (`pip install controlador-mercado[navegador]` + `playwright install chromium` en la imagen);
   no está incluido por defecto para mantener la imagen ligera.
 
-Solo el Agente Central en modo demo (sin BD ni claves):
+Solo el Agente Central en modo demo (negocio de prueba, mercado real; sin BD ni claves):
 
 ```bash
 docker compose up -d --build agente-central      # http://127.0.0.1:8090/panel

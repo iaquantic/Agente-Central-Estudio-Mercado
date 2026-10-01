@@ -16,10 +16,12 @@ COPY prompts ./prompts
 COPY config ./config
 COPY demo ./demo
 COPY docs/contratos ./docs/contratos
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN useradd --create-home agente && mkdir -p datos && chown agente datos
-USER agente
 # Monta un volumen persistente en /app/datos: panel, caché e histórico de capturas (sin él no hay tendencias).
+# El script de arranque ajusta sus permisos y ejecuta la app con el usuario sin privilegios "agente".
 VOLUME ["/app/datos"]
 EXPOSE 8090
 HEALTHCHECK --interval=60s --timeout=5s --start-period=30s CMD python -c "import urllib.request,os;urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"API_PORT\",\"8090\")}/salud')"
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["python", "-m", "agente_central", "servir"]

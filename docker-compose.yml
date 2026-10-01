@@ -2,7 +2,7 @@
 # Requiere los tres repositorios clonados uno al lado del otro:
 #   Agente-Central-Estudio-Mercado/   (este)
 #   Agente-Controlador-de-Negocio/    (Agente Interno)
-#   Agente-Controlador-de-Mercado/    (Agente Externo, se instala dentro de la imagen del Central)
+#   (el Agente Externo, Agente-Controlador-de-Mercado, se instala dentro de la imagen desde GitHub)
 #
 #   docker compose up -d                          → solo el Central (modo demo o Interno desplegado aparte)
 #   docker compose --profile completo up -d       → sistema completo (Agente Interno + Agente Central)
@@ -19,16 +19,11 @@ services:
     profiles: ["completo"]
 
   agente-central:
-    build:
-      context: .
-      additional_contexts:
-        mercado: ../Agente-Controlador-de-Mercado
+    build: .
     env_file: .env
     environment:
       API_HOST: 0.0.0.0
       INTERNO_URL: http://agente-interno:8080/v1/consulta
-      # Histórico de capturas de Revolico/Cuballama: sin él no hay tendencias de mercado. Va en el volumen persistente.
-      CONTROLADOR_CACHE_DIR: /app/datos/historial_mercado
     ports:
       # El dueño recibe el panel como archivo HTML por Telegram; este puerto solo sirve la API (/api/panel,
       # /api/preguntar) en la propia máquina. No lo publiques en Internet sin un proxy HTTPS y PANEL_TOKEN.

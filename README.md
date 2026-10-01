@@ -100,7 +100,7 @@ nano .env          # o cualquier editor
 Todo lo que cambia de un cliente a otro está en **un archivo**: `config/empresa.yaml` (copia de
 [config/empresa.plantilla.yaml](config/empresa.plantilla.yaml), que ya trae Revolico y Cuballama como fuentes de mercado). Marca, catálogo vigilado, fuentes de mercado, umbrales de las
 reglas, horarios de los avisos y modelo. Los secretos van en `.env`. Paso a paso en
-[docs/personalizacion.md](docs/personalizacion.md); despliegue en [docs/despliegue.md](docs/despliegue.md).
+[docs/personalizacion.md](docs/personalizacion.md); despliegue en [docs/despliegue.md](docs/despliegue.md) y, en Easypanel, [docs/easypanel.md](docs/easypanel.md).
 
 ## Estructura
 

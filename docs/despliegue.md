@@ -3,12 +3,13 @@
 El sistema corre en un VPS **fuera de Cuba** (la API de Claude no está disponible desde Cuba). El dueño lo usa desde Cuba
 por Telegram y por el navegador.
 
+**Easypanel:** guía paso a paso en [easypanel.md](easypanel.md) (un solo servicio, sin dominio).
+
 ## Con Docker (recomendado)
 
 ```bash
 git clone https://github.com/iaquantic/Agente-Central-Estudio-Mercado
 git clone https://github.com/iaquantic/Agente-Controlador-de-Negocio
-git clone https://github.com/iaquantic/Agente-Controlador-de-Mercado
 cd Agente-Central-Estudio-Mercado
 cp .env.example .env                          # INTERNO_MODO=api, tokens y claves
 cp config/empresa.plantilla.yaml config/empresa.yaml && $EDITOR config/empresa.yaml   # rellenar lo marcado CAMBIAR

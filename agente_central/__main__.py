@@ -103,7 +103,7 @@ async def cmd_servir(args) -> int:
         await bot.app.updater.start_polling(drop_pending_updates=True)
         logging.info("Bot de Telegram en marcha (%d usuarios autorizados)", len(cfg.telegram_usuarios))
     else:
-        logging.warning("Sin TELEGRAM_BOT_TOKEN: solo se sirve el panel web")
+        logging.warning("Sin TELEGRAM_BOT_TOKEN (o TELEGRAM_BOT_API): solo se sirve el panel web")
     try:
         await tarea_web
     finally:

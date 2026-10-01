@@ -89,7 +89,7 @@ nano .env          # o cualquier editor
 | Variable | Qué es | Dónde se obtiene |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Clave de Claude (`sk-ant-…`) | console.anthropic.com → Settings → API keys |
-| `TELEGRAM_BOT_TOKEN` | Token del bot (`123456789:AAH…`) | @BotFather → `/newbot` |
+| `TELEGRAM_BOT_TOKEN` (o `TELEGRAM_BOT_API`) | Token del bot (`123456789:AAH…`) | @BotFather → `/newbot` |
 | `TELEGRAM_USUARIOS` | IDs numéricos autorizados, separados por comas | Cada persona escribe a @userinfobot |
 | `ORQUESTADOR_TOKEN` | Secreto compartido con el Agente Interno (el mismo en ambos `.env`) | `python -c "import secrets;print(secrets.token_urlsafe(32))"` |
 

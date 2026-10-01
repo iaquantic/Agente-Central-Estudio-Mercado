@@ -61,6 +61,13 @@ def test_perfiles_invalidos(tmp_path, cambios, mensaje):
         Config.cargar(_perfil(tmp_path, cambios), entorno={})
 
 
+def test_token_del_bot_con_cualquiera_de_los_dos_nombres():
+    base = RAIZ / "config" / "empresa.demo.yaml"
+    assert Config.cargar(base, entorno={"TELEGRAM_BOT_API": "123:abc"}).telegram_token == "123:abc"
+    assert Config.cargar(base, entorno={"TELEGRAM_BOT_TOKEN": "1:a", "TELEGRAM_BOT_API": "2:b"}).telegram_token == "1:a"
+    assert Config.cargar(base, entorno={}).telegram_token is None
+
+
 def test_perfil_inexistente(tmp_path):
     with pytest.raises(ErrorConfig):
         Config.cargar(tmp_path / "no.yaml", entorno={})

@@ -119,7 +119,7 @@ class Config:
         ids = tuple(int(x) for x in (env.get("TELEGRAM_USUARIOS") or env.get("TELEGRAM_OWNER_ID") or "").replace(";", ",").split(",") if x.strip())
         cfg = Config(
             datos=datos, origen=origen,
-            telegram_token=env.get("TELEGRAM_BOT_TOKEN") or None,
+            telegram_token=env.get("TELEGRAM_BOT_TOKEN") or env.get("TELEGRAM_BOT_API") or None,   # se aceptan ambos nombres
             telegram_usuarios=ids,
             token_interno=env.get(datos["interno"].get("token_env") or "ORQUESTADOR_TOKEN") or None,
             panel_token=env.get("PANEL_TOKEN") or None,

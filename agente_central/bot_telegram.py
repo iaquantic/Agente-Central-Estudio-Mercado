@@ -132,6 +132,11 @@ class BotTelegram:
         t = self.s.cfg.panel_token
         return f"{base}/panel" + (f"?t={t}" if t else "")
 
+    async def _anotar(self, update: Update, entrada: str, respuesta: str = "ok") -> None:
+        """Registro de los comandos sin modelo, para medir el uso real."""
+        await self.s.registro.interaccion(canal="telegram", usuario_id=update.effective_user.id, entrada=entrada,
+                                          respuesta=respuesta, estado="ok")
+
     async def _consultar(self, update: Update, pregunta: str, *, entrada: str | None = None) -> None:
         chat_id = update.effective_chat.id
         orquestador = self.s.orquestador
@@ -161,10 +166,12 @@ class BotTelegram:
         if await self._autorizado(update):
             await update.effective_message.reply_text(bienvenida(self.s.cfg.nombre), parse_mode=ParseMode.HTML,
                                                       reply_markup=teclado(BOTONES_INICIO))
+            await self._anotar(update, "/start")
 
     async def cmd_ayuda(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if await self._autorizado(update):
             await update.effective_message.reply_text(AYUDA, parse_mode=ParseMode.HTML)
+            await self._anotar(update, "/ayuda")
 
     async def _documento_panel(self, chat_id: int) -> None:
         """Envía el panel como archivo HTML autocontenido (se abre en el navegador del móvil, también sin conexión)."""
@@ -196,6 +203,7 @@ class BotTelegram:
     async def cmd_oportunidades(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if await self._autorizado(update):
             await self._oportunidades(update.effective_chat.id)
+            await self._anotar(update, "/oportunidades")
 
     async def _negocio(self, chat_id: int) -> None:
         r = await self.s.interno.informe("estado_general")
@@ -211,6 +219,7 @@ class BotTelegram:
     async def cmd_negocio(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if await self._autorizado(update):
             await self._negocio(update.effective_chat.id)
+            await self._anotar(update, "/negocio")
 
     async def cmd_mercado(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not await self._autorizado(update):
@@ -241,6 +250,7 @@ class BotTelegram:
         acciones = {"panel": self._panel, "oportunidades": self._oportunidades, "negocio": self._negocio}
         if q.data in acciones:
             await acciones[q.data](chat_id)
+            await self._anotar(update, f"[botón] {q.data}")
 
     async def texto(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if await self._autorizado(update):

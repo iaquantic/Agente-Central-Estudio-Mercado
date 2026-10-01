@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{TITULO}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family={{FUENTE_TITULOS_URL}}:wght@500;600;700&family={{FUENTE_TEXTO_URL}}:wght@400;500;600&display=swap">
+<style>
+/* Panel Quantic: banda de marca en azul noche, contenido en tarjetas sobre fondo lavanda muy claro.
+   Los colores de marca vienen del perfil de la empresa (marca.colores); el resto se deriva aquí. */
+:root {
+  --marca-primario: {{COLOR_PRIMARIO}};
+  --marca-acento: {{COLOR_ACENTO}};
+  --marca-acento-fuerte: {{COLOR_ACENTO_FUERTE}};
+  --marca-suave: {{COLOR_SUAVE}};
+  --font-titulos: "{{FUENTE_TITULOS}}", "Segoe UI", system-ui, sans-serif;
+  --font-texto: "{{FUENTE_TEXTO}}", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  --bg: #F5F5FB;
+  --surface: #FFFFFF;
+  --surface-2: #F0EFFA;
+  --fg: #12123A;
+  --fg-2: #4A4A6A;
+  --muted: #7A7A96;
+  --grid: #E4E3F0;
+  --axis: #C9C8DA;
+  --border: rgba(16, 16, 99, 0.10);
+  --banda: var(--marca-primario);
+  --banda-fg: #FFFFFF;
+  --banda-fg-2: #C9C5F7;
+  --serie-negocio: {{SERIE_NEGOCIO}};
+  --serie-mercado: #D9692B;
+  --serie-3: #1A9E8F;
+  --banda-mercado: rgba(217, 105, 43, 0.16);
+  --critico: #D03B3B;
+  --serio: #EC835A;
+  --aviso: #FAB219;
+  --bien: #0CA30C;
+  --bien-texto: #006300;
+  --mal-texto: #B42323;
+  --chip-bg: var(--marca-suave);
+  --chip-fg: var(--marca-primario);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E0E2C; --surface: #171744; --surface-2: #1F1F52; --fg: #F2F1FF; --fg-2: #C4C2E6; --muted: #9593BE;
+    --grid: #2A2A5E; --axis: #3A3A72; --border: rgba(255, 255, 255, 0.10); --banda: #0A0A40; --banda-fg: #FFFFFF;
+    --banda-fg-2: #B4AEF5; --serie-negocio: {{SERIE_NEGOCIO_OSCURO}}; --serie-mercado: #D9692B; --serie-3: #2BA898;
+    --banda-mercado: rgba(217, 105, 43, 0.24); --bien-texto: #3CCB3C; --mal-texto: #FF8A8A;
+    --chip-bg: #2A2A66; --chip-fg: #DCD8FF; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E0E2C; --surface: #171744; --surface-2: #1F1F52; --fg: #F2F1FF; --fg-2: #C4C2E6; --muted: #9593BE;
+  --grid: #2A2A5E; --axis: #3A3A72; --border: rgba(255, 255, 255, 0.10); --banda: #0A0A40; --banda-fg: #FFFFFF;
+  --banda-fg-2: #B4AEF5; --serie-negocio: {{SERIE_NEGOCIO_OSCURO}}; --serie-mercado: #D9692B; --serie-3: #2BA898;
+  --banda-mercado: rgba(217, 105, 43, 0.24); --bien-texto: #3CCB3C; --mal-texto: #FF8A8A;
+  --chip-bg: #2A2A66; --chip-fg: #DCD8FF; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--font-texto); -webkit-font-smoothing: antialiased; }
+h1, h2, h3 { font-family: var(--font-titulos); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+.contenedor { max-width: 1240px; margin: 0 auto; padding-inline: 16px; }
+
+/* Banda de marca */
+.banda { background: var(--banda); color: var(--banda-fg); padding-block: 20px 72px; }
+.banda .fila { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center; justify-content: space-between; }
+.marca { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.marca .logo { width: 44px; height: 38px; flex: none; background: #FFFFFF; border-radius: 10px; display: grid; place-items: center; padding: 5px; }
+.marca .logo svg, .marca .logo img { width: 100%; height: 100%; }
+.marca .proveedor { font: 600 12px/1 var(--font-titulos); letter-spacing: 0.12em; text-transform: uppercase; color: var(--banda-fg-2); }
+.marca h1 { font-size: clamp(22px, 3.2vw, 30px); font-weight: 600; margin-top: 4px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; color: var(--banda-fg-2); }
+.pastilla { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.22); border-radius: 999px; padding: 4px 12px; color: var(--banda-fg); white-space: nowrap; }
+.pastilla.demo { background: var(--marca-acento); border-color: transparent; font-weight: 600; }
+.subtitulo-banda { margin-top: 18px; color: var(--banda-fg-2); max-width: 70ch; font-size: 14px; }
+
+main { margin-top: -52px; padding-bottom: 48px; display: grid; gap: 20px; }
+.tarjeta { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; min-width: 0; }
+.tarjeta > header { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+.tarjeta h2 { font-size: 18px; font-weight: 600; }
+.nota { color: var(--muted); font-size: 13px; }
+.eyebrow { font: 600 11px/1.2 var(--font-titulos); letter-spacing: 0.12em; text-transform: uppercase; color: var(--marca-acento-fuerte); }
+:root[data-theme="dark"] .eyebrow { color: #B4AEF5; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .eyebrow { color: #B4AEF5; } }
+.rejilla-2 { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); }
+
+/* KPIs */
+.kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; min-width: 0; }
+.kpi .etq { font-size: 13px; color: var(--fg-2); }
+.kpi .valor { font: 600 26px/1.15 var(--font-titulos); margin-top: 6px; overflow-wrap: anywhere; }
+.kpi .delta { font-size: 12.5px; margin-top: 4px; color: var(--muted); }
+.sube-bien { color: var(--bien-texto); } .baja-mal { color: var(--mal-texto); }
+
+/* Propuestas */
+.propuestas { display: grid; gap: 10px; }
+.propuesta { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 14px; padding: 14px 16px; border-radius: 12px; background: var(--surface-2); align-items: start; }
+.propuesta .prod { font-size: 12.5px; color: var(--fg-2); }
+.propuesta h3 { font-size: 15.5px; font-weight: 600; margin-top: 2px; }
+.propuesta p { margin: 6px 0 0; color: var(--fg-2); font-size: 14px; max-width: 80ch; }
+.propuesta .impacto { text-align: right; white-space: nowrap; }
+.propuesta .impacto b { display: block; font: 600 18px/1.2 var(--font-titulos); }
+.propuesta .impacto span { font-size: 11.5px; color: var(--muted); display: block; max-width: 22ch; white-space: normal; }
+@media (max-width: 640px) { .propuesta { grid-template-columns: 1fr; } .propuesta .impacto { text-align: left; } }
+.chip { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 var(--font-texto); padding: 5px 10px 5px 8px; border-radius: 999px; white-space: nowrap; background: var(--chip-bg); color: var(--chip-fg); }
+.chip svg { width: 12px; height: 12px; flex: none; }
+.chip.alta, .chip.urgent, .chip.agotado { background: color-mix(in srgb, var(--critico) 16%, transparent); color: var(--mal-texto); }
+.chip.media, .chip.high, .chip.riesgo_rotura { background: color-mix(in srgb, var(--serio) 20%, transparent); color: var(--fg); }
+.chip.baja, .chip.medium, .chip.stock_bajo { background: color-mix(in srgb, var(--aviso) 22%, transparent); color: var(--fg); }
+.chip.info, .chip.low, .chip.sin_movimiento, .chip.exceso { background: var(--chip-bg); color: var(--chip-fg); }
+.chip.alta svg, .chip.urgent svg, .chip.agotado svg { fill: var(--critico); }
+.chip.media svg, .chip.high svg, .chip.riesgo_rotura svg { fill: var(--serio); }
+.chip.baja svg, .chip.medium svg, .chip.stock_bajo svg { fill: var(--aviso); }
+.chip.info svg, .chip.low svg, .chip.exceso svg, .chip.sin_movimiento svg { fill: var(--marca-acento); }
+
+/* Posición de precio */
+.leyenda { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--fg-2); }
+.leyenda i { display: inline-block; vertical-align: middle; margin-right: 6px; }
+.k-punto { width: 10px; height: 10px; border-radius: 50%; background: var(--serie-negocio); }
+.k-banda { width: 18px; height: 10px; border-radius: 3px; background: var(--banda-mercado); }
+.k-mediana { width: 3px; height: 14px; border-radius: 2px; background: var(--serie-mercado); }
+.k-linea-n { width: 16px; height: 2px; background: var(--serie-negocio); }
+.k-linea-m { width: 16px; height: 2px; background: var(--serie-mercado); }
+.posicion { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr) 76px; gap: 0 14px; align-items: center; }
+.posicion .eje { grid-column: 2; position: relative; height: 18px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.posicion .eje span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.posicion .eje span:first-child { transform: none; }
+.posicion .eje span:last-child { transform: translateX(-100%); }
+.posicion .nombre { font-size: 14px; padding-block: 10px; min-width: 0; }
+.posicion .nombre small { display: block; color: var(--muted); font-size: 12px; }
+.pista { position: relative; height: 34px; cursor: default; }
+.pista::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--grid); }
+.pista .cero { position: absolute; top: 4px; bottom: 4px; width: 1px; background: var(--axis); }
+.pista .rango { position: absolute; top: 11px; height: 12px; border-radius: 4px; background: var(--banda-mercado); }
+.pista .mediana { position: absolute; top: 7px; height: 20px; width: 3px; border-radius: 2px; background: var(--serie-mercado); transform: translateX(-50%); }
+.pista .tu { position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%; background: var(--serie-negocio); box-shadow: 0 0 0 2px var(--surface); transform: translate(-50%, -50%); }
+.posicion .dif { text-align: right; font: 600 14px/1 var(--font-titulos); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .posicion { grid-template-columns: minmax(0, 1fr) 64px; } .posicion .nombre { grid-column: 1 / -1; padding-bottom: 0; } .posicion .eje { grid-column: 1; } }
+
+/* Tendencias (pequeños múltiplos) */
+.multiples { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.mini { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+.mini .cab { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.mini h3 { font-size: 14px; font-weight: 600; font-family: var(--font-texto); }
+.mini .var { font: 600 13px/1 var(--font-titulos); white-space: nowrap; }
+.mini .pie { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.grafico { width: 100%; display: block; overflow: visible; }
+
+/* Barras horizontales */
+.hbarras { display: grid; gap: 8px; }
+.hbarra { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 12px; align-items: center; font-size: 13.5px; }
+.hbarra .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hbarra .t { position: relative; height: 14px; }
+.hbarra .b { position: absolute; top: 1px; height: 12px; background: var(--serie-negocio); border-radius: 0 4px 4px 0; }
+.hbarra .b.neg { background: var(--critico); border-radius: 4px 0 0 4px; }
+.hbarra .b.cero-v { width: 2px !important; background: var(--axis); }
+.hbarra .v { position: absolute; top: -2px; font-size: 12.5px; color: var(--fg-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hbarra .z { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--axis); }
+
+/* Tablas */
+.tabla-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th { text-align: left; font-weight: 600; color: var(--fg-2); border-bottom: 1px solid var(--axis); padding: 8px 10px; white-space: nowrap; }
+td { border-bottom: 1px solid var(--grid); padding: 8px 10px; vertical-align: top; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+details summary { cursor: pointer; color: var(--marca-acento-fuerte); font-size: 13.5px; margin-top: 12px; }
+:root[data-theme="dark"] details summary { color: #B4AEF5; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) details summary { color: #B4AEF5; } }
+details[open] summary { margin-bottom: 8px; }
+
+/* Inventario y alertas */
+.estados { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.alertas { display: grid; gap: 8px; }
+.alerta { padding: 10px 0; border-bottom: 1px solid var(--grid); }
+.alerta:last-child { border-bottom: 0; }
+.alerta .cab { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.alerta b { font-weight: 600; font-size: 14px; }
+.alerta p { margin: 4px 0 0; color: var(--fg-2); font-size: 13.5px; }
+
+/* Calidad */
+.calidad { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); font-size: 13.5px; color: var(--fg-2); }
+.calidad h3 { font-size: 14px; color: var(--fg); margin-bottom: 6px; font-family: var(--font-texto); }
+.calidad ul { margin: 0; padding-left: 18px; }
+footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 32px; }
+
+/* Tooltip */
+#tip { position: fixed; z-index: 10; pointer-events: none; background: var(--fg); color: var(--bg); font-size: 12.5px; line-height: 1.4; padding: 8px 10px; border-radius: 8px; max-width: 280px; box-shadow: 0 6px 24px rgba(0,0,0,0.18); }
+:focus-visible { outline: 2px solid var(--marca-acento); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) { .tu, .hbarra .b { transition: transform 0.15s ease; } }
+</style>
+</head>
+<body>
+<div class="banda">
+  <div class="contenedor">
+    <div class="fila">
+      <div class="marca">
+        <div class="logo" aria-hidden="true">{{LOGO}}</div>
+        {{LOGO_CLIENTE}}
+        <div>
+          <div class="proveedor" id="proveedor"></div>
+          <h1 id="titulo"></h1>
+        </div>
+      </div>
+      <div class="meta" id="meta"></div>
+    </div>
+    <p class="subtitulo-banda" id="subtitulo"></p>
+  </div>
+</div>
+
+<main class="contenedor">
+  <section class="kpis" id="kpis" aria-label="Indicadores principales"></section>
+
+  <section class="tarjeta" aria-labelledby="t-propuestas">
+    <header><div><div class="eyebrow">Negocio × mercado</div><h2 id="t-propuestas">Decisiones propuestas</h2></div>
+      <span class="nota">Propuestas del Agente Central a partir de los dos agentes. Tú decides; ningún agente cambia precios ni stock.</span></header>
+    <div class="propuestas" id="propuestas"></div>
+  </section>
+
+  <section class="tarjeta" aria-labelledby="t-posicion">
+    <header><div><div class="eyebrow">Precio</div><h2 id="t-posicion">Tu precio frente al mercado</h2></div>
+      <div class="leyenda"><span><i class="k-punto"></i>Tu precio</span><span><i class="k-mediana"></i>Mediana del mercado</span><span><i class="k-banda"></i>Mitad central de los anuncios (p25–p75)</span></div></header>
+    <div class="posicion" id="posicion"></div>
+    <details><summary>Ver como tabla</summary><div class="tabla-scroll" id="tabla-posicion"></div></details>
+  </section>
+
+  <section class="tarjeta" aria-labelledby="t-tendencias">
+    <header><div><div class="eyebrow">Mercado</div><h2 id="t-tendencias">Tendencia de precios en el mercado</h2></div>
+      <div class="leyenda"><span><i class="k-linea-m"></i>Mediana semanal del mercado (USD equiv.)</span><span><i class="k-linea-n"></i>Tu precio actual</span></div></header>
+    <div class="multiples" id="tendencias"></div>
+    <p class="nota" id="nota-tendencias"></p>
+  </section>
+
+  <section class="tarjeta" aria-labelledby="t-ventas">
+    <header><div><div class="eyebrow">Negocio</div><h2 id="t-ventas">Ventas netas por mes</h2></div><span class="nota" id="nota-ventas"></span></header>
+    <div id="ventas-mensuales"></div>
+    <details><summary>Ver como tabla</summary><div class="tabla-scroll" id="tabla-ventas"></div></details>
+  </section>
+
+  <div class="rejilla-2">
+    <section class="tarjeta" aria-labelledby="t-mas"><header><h2 id="t-mas">Más vendidos</h2><span class="nota">unidades, mes en curso</span></header><div class="hbarras" id="mas-vendidos"></div></section>
+    <section class="tarjeta" aria-labelledby="t-menos"><header><h2 id="t-menos">Menos vendidos</h2><span class="nota">unidades, mes en curso</span></header><div class="hbarras" id="menos-vendidos"></div></section>
+  </div>
+  <div class="rejilla-2">
+    <section class="tarjeta" aria-labelledby="t-rent"><header><h2 id="t-rent">Más rentables</h2><span class="nota">margen bruto %, mes en curso</span></header><div class="hbarras" id="mas-rentables"></div></section>
+    <section class="tarjeta" aria-labelledby="t-norent"><header><h2 id="t-norent">Menos rentables</h2><span class="nota">margen bruto %, mes en curso</span></header><div class="hbarras" id="menos-rentables"></div></section>
+  </div>
+
+  <div class="rejilla-2">
+    <section class="tarjeta" aria-labelledby="t-cat"><header><h2 id="t-cat">Categorías</h2><span class="nota">ventas y margen del mes</span></header><div class="tabla-scroll" id="categorias"></div></section>
+    <section class="tarjeta" aria-labelledby="t-tasa"><header><h2 id="t-tasa">Tasa USD → CUP</h2><span class="nota" id="nota-tasa"></span></header><div id="tasa"></div></section>
+  </div>
+
+  <div class="rejilla-2">
+    <section class="tarjeta" aria-labelledby="t-inv"><header><h2 id="t-inv">Inventario</h2><span class="nota" id="nota-inv"></span></header>
+      <div class="estados" id="estados"></div><div class="tabla-scroll" id="inventario"></div></section>
+    <section class="tarjeta" aria-labelledby="t-alertas"><header><h2 id="t-alertas">Alertas del negocio</h2><span class="nota" id="nota-alertas"></span></header><div class="alertas" id="alertas"></div></section>
+  </div>
+
+  <section class="tarjeta" aria-labelledby="t-calidad">
+    <header><h2 id="t-calidad">Calidad de los datos y fuentes</h2></header>
+    <div class="calidad" id="calidad"></div>
+  </section>
+  <footer class="pie-pagina" id="pie"></footer>
+</main>
+<div id="tip" hidden></div>
+
+<script id="datos-panel" type="application/json">{{DATOS}}</script>
+<script>
+(function () {
+  "use strict";
+  const D = JSON.parse(document.getElementById("datos-panel").textContent);
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+  const nf0 = new Intl.NumberFormat("es-ES", {maximumFractionDigits: 0, useGrouping: "always"});
+  const nf1 = new Intl.NumberFormat("es-ES", {minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: "always"});
+  const nf2 = new Intl.NumberFormat("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always"});
+  const usd = (v, d = 0) => v == null ? "—" : (d ? nf2 : nf0).format(v) + " USD";
+  const compacto = (v) => v == null ? "—" : Math.abs(v) >= 1e6 ? nf1.format(v / 1e6) + " M" : Math.abs(v) >= 1e4 ? nf1.format(v / 1e3) + " k" : nf0.format(v);
+  const pct = (v, signo = true) => v == null ? "—" : (signo && v > 0 ? "+" : "") + nf1.format(v) + " %";
+  const TZ = (D.meta && D.meta.zona_horaria) || undefined;
+  const fechaHora = (s) => s ? new Date(s).toLocaleString("es-ES", {timeZone: TZ, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}) : "—";
+  const fecha = (s) => s ? new Date(s.length === 10 ? s + "T12:00:00" : s).toLocaleDateString("es-ES", {day: "numeric", month: "short"}) : "—";
+  const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const ICONO = {
+    alta: '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 .8 11.6 11H.4z"/></svg>',
+    media: '<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="5.2"/></svg>',
+    baja: '<svg viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2"/></svg>',
+    info: '<svg viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="4.5" width="10" height="3" rx="1.5"/></svg>'};
+  const PRIO = {alta: "Prioridad alta", media: "Prioridad media", baja: "Prioridad baja", info: "Informativo"};
+  const PRIO_ALERTA = {urgent: ["alta", "Urgente"], high: ["media", "Alta"], medium: ["baja", "Media"], low: ["info", "Baja"]};
+  const ESTADO = {agotado: ["alta", "Agotado"], riesgo_rotura: ["media", "Riesgo de rotura"], stock_bajo: ["baja", "Stock bajo"],
+                  exceso: ["info", "Exceso"], sin_movimiento: ["info", "Sin movimiento"]};
+  const chip = (clase, texto, icono) => `<span class="chip ${clase}">${ICONO[icono || clase] || ""}${esc(texto)}</span>`;
+
+  // Tooltip compartido ---------------------------------------------------------------------
+  const tip = $("tip");
+  function mostrarTip(html, x, y) {
+    tip.innerHTML = html; tip.hidden = false;
+    const r = tip.getBoundingClientRect();
+    tip.style.left = Math.min(window.innerWidth - r.width - 8, Math.max(8, x + 14)) + "px";
+    tip.style.top = Math.max(8, y - r.height - 12) + "px";
+  }
+  const ocultarTip = () => { tip.hidden = true; };
+  document.addEventListener("pointermove", (e) => {
+    const el = e.target.closest && e.target.closest("[data-tip]");
+    if (el) mostrarTip(el.getAttribute("data-tip"), e.clientX, e.clientY); else if (!e.target.closest("[data-tip-zona]")) ocultarTip();
+  });
+  document.addEventListener("focusin", (e) => {
+    const el = e.target.closest && e.target.closest("[data-tip]");
+    if (el) { const r = el.getBoundingClientRect(); mostrarTip(el.getAttribute("data-tip"), r.left + r.width / 2, r.top); }
+  });
+  document.addEventListener("focusout", ocultarTip);
+
+  // Cabecera ----------------------------------------------------------------------------------
+  const M = D.meta;
+  document.title = `${M.empresa.nombre} · ${M.titulo}`;
+  $("proveedor").textContent = M.proveedor;
+  $("titulo").textContent = `${M.empresa.nombre} · ${M.titulo}`;
+  const fx = D.tasa && D.tasa.actual;
+  $("meta").innerHTML = [
+    M.demo ? '<span class="pastilla demo">Datos de demostración</span>' : "",
+    `<span class="pastilla">Periodo: ${fecha(M.periodo.desde)} – ${fecha(M.periodo.hasta)}</span>`,
+    fx ? `<span class="pastilla">1 USD = ${nf2.format(fx.usd_cup)} CUP · ${esc(fx.source)}</span>` : "",
+    `<span class="pastilla">Actualizado ${fechaHora(M.generado)}</span>`
+  ].join("");
+  $("subtitulo").textContent = M.empresa.descripcion || "";
+
+  // KPIs --------------------------------------------------------------------------------------
+  (function kpis() {
+    const r = D.resumen || {}, vm = D.ventas_mes || {}, t = vm.totales || {}, c = (vm.comparacion || {}).delta_pct || {};
+    const inv = (D.inventario || {}).totals || {}, al = (D.alertas || {}).count_by_priority || {};
+    const delta = (v, txt, bueno = 1) => v == null ? `<div class="delta">${txt}</div>` :
+      `<div class="delta"><span class="${v * bueno >= 0 ? "sube-bien" : "baja-mal"}">${v > 0 ? "▲" : v < 0 ? "▼" : ""} ${pct(v)}</span> ${txt}</div>`;
+    const items = [
+      ["Ventas netas del mes", usd(t.net_usd), delta(c.net_usd, "vs. periodo anterior")],
+      ["Margen bruto", t.gross_margin_pct == null ? "—" : nf1.format(t.gross_margin_pct) + " %", (() => {
+        const ant = ((vm.comparacion || {}).totales || (vm.comparacion || {}).totals || {}).gross_margin_pct, dm = ant == null || t.gross_margin_pct == null ? null : t.gross_margin_pct - ant;
+        return dm == null ? `<div class="delta">${usd(t.gross_profit_usd)} de beneficio bruto</div>` :
+          `<div class="delta"><span class="${dm >= 0 ? "sube-bien" : "baja-mal"}">${dm > 0 ? "▲" : dm < 0 ? "▼" : ""} ${dm > 0 ? "+" : ""}${nf1.format(dm)} pp</span> vs. periodo anterior</div>`; })()],
+      ["Ticket medio", usd(t.avg_ticket_usd, 2), delta(c.avg_ticket_usd, "vs. periodo anterior")],
+      ["Ventas de hoy", usd((r.today || {}).net_usd), delta(r.vs_expected_pct, `vs. lo esperado a las ${esc(r.as_of_hour || "")}`)],
+      ["Alertas urgentes", nf0.format(al.urgent || 0), `<div class="delta">${nf0.format(al.high || 0)} de prioridad alta</div>`],
+      ["Dinero inmovilizado", usd(inv.immobilized_value_usd), `<div class="delta">exceso y sin movimiento, a coste</div>`],
+    ];
+    $("kpis").innerHTML = items.map(([e, v, d]) => `<div class="kpi"><div class="etq">${e}</div><div class="valor">${v}</div>${d}</div>`).join("");
+  })();
+
+  // Propuestas -------------------------------------------------------------------------------
+  (function propuestas() {
+    const ps = (D.propuestas || []).slice(0, 10);
+    $("propuestas").innerHTML = ps.length ? ps.map((p) => `
+      <article class="propuesta">
+        <div>${chip(p.prioridad, PRIO[p.prioridad])}</div>
+        <div><div class="prod">${esc(p.nombre)} · ${esc(p.sku)}</div><h3>${esc(p.titulo)}</h3><p>${esc(p.detalle)}</p></div>
+        <div class="impacto">${p.impacto_usd != null ? `<b>${usd(p.impacto_usd)}</b><span>${esc(p.base_impacto || "")}</span>` : ""}</div>
+      </article>`).join("") : '<p class="nota">No hay decisiones pendientes para los productos vigilados.</p>';
+  })();
+
+  // Posición de precio -----------------------------------------------------------------------
+  (function posicion() {
+    const ps = (D.productos || []).filter((p) => p.mercado && p.mercado.referencia_usd);
+    if (!ps.length) { $("posicion").innerHTML = '<p class="nota">Sin datos de mercado comparables.</p>'; return; }
+    const rel = (v, ref) => v == null ? null : (v - ref) / ref * 100;
+    let lim = 10;
+    ps.forEach((p) => { const m = p.mercado; [rel(p.interno.precio_usd, m.referencia_usd), rel(m.p25_usd, m.referencia_usd), rel(m.p75_usd, m.referencia_usd)].forEach((v) => { if (v != null) lim = Math.max(lim, Math.abs(v)); }); });
+    lim = Math.ceil(lim / 10) * 10;
+    const x = (v) => ((v + lim) / (2 * lim) * 100).toFixed(2) + "%";
+    const ticks = [-lim, -lim / 2, 0, lim / 2, lim];
+    let html = `<div></div><div class="eje">${ticks.map((t) => `<span style="left:${x(t)}">${t > 0 ? "+" : ""}${nf0.format(t)} %</span>`).join("")}</div><div></div>`;
+    ps.forEach((p) => {
+      const m = p.mercado, d = p.posicion.diferencia_pct;
+      const p25 = rel(m.p25_usd, m.referencia_usd), p75 = rel(m.p75_usd, m.referencia_usd);
+      const t = `<b>${esc(p.nombre)}</b><br>Tu precio: ${usd(p.interno.precio_usd, 2)}<br>Mediana del mercado: ${usd(m.referencia_usd, 2)}<br>p25–p75: ${usd(m.p25_usd, 2)} – ${usd(m.p75_usd, 2)}<br>${m.n} anuncios · confianza ${esc(m.confianza)}`;
+      html += `<div class="nombre">${esc(p.nombre)}<small>${usd(p.interno.precio_usd, 2)} · mercado ${usd(m.referencia_usd, 2)}</small></div>
+        <div class="pista" tabindex="0" data-tip="${esc(t)}" aria-label="${esc(p.nombre)}: tu precio ${pct(d)} frente a la mediana">
+          <div class="cero" style="left:${x(0)}"></div>
+          ${p25 != null && p75 != null ? `<div class="rango" style="left:${x(p25)};width:calc(${x(p75)} - ${x(p25)})"></div>` : ""}
+          <div class="mediana" style="left:${x(0)}"></div>
+          <div class="tu" style="left:${x(Math.max(-lim, Math.min(lim, d)))}"></div>
+        </div>
+        <div class="dif">${pct(d)}</div>`;
+    });
+    $("posicion").innerHTML = html;
+    $("tabla-posicion").innerHTML = `<table><thead><tr><th>Producto</th><th class="num">Tu precio</th><th class="num">Mediana mercado</th><th class="num">p25</th><th class="num">p75</th><th class="num">Diferencia</th><th class="num">Anuncios</th><th>Confianza</th></tr></thead><tbody>${
+      ps.map((p) => `<tr><td>${esc(p.nombre)}</td><td class="num">${usd(p.interno.precio_usd, 2)}</td><td class="num">${usd(p.mercado.referencia_usd, 2)}</td><td class="num">${usd(p.mercado.p25_usd, 2)}</td><td class="num">${usd(p.mercado.p75_usd, 2)}</td><td class="num">${pct(p.posicion.diferencia_pct)}</td><td class="num">${p.mercado.n}</td><td>${esc(p.mercado.confianza)}</td></tr>`).join("")}</tbody></table>`;
+  })();
+
+  // Utilidades SVG ---------------------------------------------------------------------------
+  const NS = "http://www.w3.org/2000/svg";
+  function svg(w, h) { const s = document.createElementNS(NS, "svg"); s.setAttribute("viewBox", `0 0 ${w} ${h}`); s.setAttribute("width", w); s.setAttribute("height", h); s.classList.add("grafico"); return s; }
+  function el(tag, attrs, padre) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (padre) padre.appendChild(e); return e; }
+  function texto(t, attrs, padre) { const e = el("text", {fill: "var(--muted)", "font-size": 11.5, ...attrs}, padre); e.textContent = t; return e; }
+  function limpios(min, max, n = 4) {
+    const paso0 = (max - min) / n || 1, mag = Math.pow(10, Math.floor(Math.log10(paso0))), r = paso0 / mag;
+    const paso = (r <= 1 ? 1 : r <= 2 ? 2 : r <= 2.5 ? 2.5 : r <= 5 ? 5 : 10) * mag;
+    const out = []; for (let v = Math.floor(min / paso) * paso; v <= max + paso * 0.001; v += paso) out.push(+v.toFixed(10));
+    return out;
+  }
+
+  // Tendencias (pequeños múltiplos) ----------------------------------------------------------
+  function tendencias() {
+    const cont = $("tendencias"); cont.innerHTML = "";
+    (D.productos || []).filter((p) => p.mercado).forEach((p) => {
+      const m = p.mercado, serie = (m.serie_usd || []).filter((s) => s.usd != null), precio = p.interno.precio_usd;
+      const caja = document.createElement("div"); caja.className = "mini";
+      const v = m.variacion_usd_pct;
+      caja.innerHTML = `<div class="cab"><h3>${esc(p.nombre)}</h3><span class="var">${v == null ? "—" : (v > 0 ? "▲ " : v < 0 ? "▼ " : "") + pct(v)}</span></div>`;
+      cont.appendChild(caja);
+      const W = Math.max(200, caja.clientWidth - 28), H = 92, pad = {l: 4, r: 40, t: 8, b: 6};
+      const vals = serie.map((s) => s.usd).concat(precio != null ? [precio] : []);
+      if (serie.length < 2) { caja.insertAdjacentHTML("beforeend", '<p class="nota">Sin serie suficiente.</p>'); return; }
+      let lo = Math.min(...vals), hi = Math.max(...vals); const mg = (hi - lo) * 0.15 || hi * 0.05; lo -= mg; hi += mg;
+      const X = (i) => pad.l + i * (W - pad.l - pad.r) / (serie.length - 1), Y = (val) => pad.t + (hi - val) / (hi - lo) * (H - pad.t - pad.b);
+      const s = svg(W, H); s.setAttribute("data-tip-zona", "");
+      s.setAttribute("role", "img"); s.setAttribute("aria-label", `${p.nombre}: mercado de ${usd(serie[0].usd, 2)} a ${usd(serie[serie.length - 1].usd, 2)}`);
+      const pts = serie.map((d, i) => `${X(i).toFixed(1)},${Y(d.usd).toFixed(1)}`);
+      el("path", {d: `M${pts[0]} L${pts.slice(1).join(" L")} L${X(serie.length - 1)},${H - pad.b} L${X(0)},${H - pad.b} Z`, fill: "var(--serie-mercado)", "fill-opacity": 0.10, stroke: "none"}, s);
+      if (precio != null) el("line", {x1: pad.l, x2: W - pad.r, y1: Y(precio), y2: Y(precio), stroke: "var(--serie-negocio)", "stroke-width": 2, "stroke-linecap": "round"}, s);
+      el("path", {d: `M${pts.join(" L")}`, fill: "none", stroke: "var(--serie-mercado)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round"}, s);
+      const ult = serie[serie.length - 1];
+      el("circle", {cx: X(serie.length - 1), cy: Y(ult.usd), r: 4, fill: "var(--serie-mercado)", stroke: "var(--surface)", "stroke-width": 2}, s);
+      texto(nf2.format(ult.usd), {x: W - pad.r + 8, y: Y(ult.usd) + 4, fill: "var(--fg-2)"}, s);
+      if (precio != null && Math.abs(Y(precio) - Y(ult.usd)) > 12) texto(nf2.format(precio), {x: W - pad.r + 8, y: Y(precio) + 4, fill: "var(--fg-2)"}, s);
+      const guia = el("line", {y1: pad.t, y2: H - pad.b, stroke: "var(--axis)", "stroke-width": 1, visibility: "hidden"}, s);
+      const marca = el("circle", {r: 4, fill: "var(--serie-mercado)", stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden"}, s);
+      el("rect", {x: 0, y: 0, width: W, height: H, fill: "transparent"}, s).addEventListener("pointermove", (e) => {
+        const r = s.getBoundingClientRect(), i = Math.max(0, Math.min(serie.length - 1, Math.round((e.clientX - r.left - pad.l) / ((W - pad.l - pad.r) / (serie.length - 1)))));
+        guia.setAttribute("x1", X(i)); guia.setAttribute("x2", X(i)); guia.setAttribute("visibility", "visible");
+        marca.setAttribute("cx", X(i)); marca.setAttribute("cy", Y(serie[i].usd)); marca.setAttribute("visibility", "visible");
+        mostrarTip(`Semana del ${fecha(serie[i].semana)}<br>Mercado: ${usd(serie[i].usd, 2)}${serie[i].anuncios != null ? ` · ${serie[i].anuncios} anuncios` : ""}<br>Tu precio hoy: ${usd(precio, 2)}`, e.clientX, e.clientY);
+      });
+      s.addEventListener("pointerleave", () => { guia.setAttribute("visibility", "hidden"); marca.setAttribute("visibility", "hidden"); ocultarTip(); });
+      caja.appendChild(s);
+      const tc = m.tendencia_controlador;
+      caja.insertAdjacentHTML("beforeend", `<div class="pie"><span>${fecha(serie[0].semana)} – ${fecha(ult.semana)}</span><span>${tc ? esc(tc.classification.replace(/_/g, " ").toLowerCase()) : ""} · conf. ${esc(m.confianza)}</span></div>`);
+    });
+    $("nota-tendencias").textContent = "Mediana semanal de los anuncios comparables. Los precios en CUP se convierten a USD con la tasa informal de cada semana (estimación), para separar el movimiento del producto del de la tasa.";
+  }
+
+  // Ventas mensuales -------------------------------------------------------------------------
+  function ventasMensuales() {
+    const cont = $("ventas-mensuales"); cont.innerHTML = "";
+    const g = D.ventas_mensuales || []; if (!g.length) { cont.innerHTML = '<p class="nota">Sin datos.</p>'; return; }
+    const W = Math.max(300, cont.clientWidth), H = 240, pad = {l: 56, r: 8, t: 12, b: 28};
+    const max = Math.max(...g.map((x) => x.net_usd)), ticks = limpios(0, max), top = ticks[ticks.length - 1];
+    const s = svg(W, H), bw = (W - pad.l - pad.r) / g.length, ancho = Math.min(24, bw * 0.6);
+    const Y = (v) => pad.t + (top - v) / top * (H - pad.t - pad.b);
+    ticks.forEach((t) => { el("line", {x1: pad.l, x2: W - pad.r, y1: Y(t), y2: Y(t), stroke: t === 0 ? "var(--axis)" : "var(--grid)", "stroke-width": 1}, s); texto(compacto(t), {x: pad.l - 8, y: Y(t) + 4, "text-anchor": "end"}, s); });
+    const mx = g.reduce((a, b) => b.net_usd > a.net_usd ? b : a);
+    g.forEach((x, i) => {
+      const cx = pad.l + bw * i + bw / 2, y = Y(x.net_usd), h = H - pad.b - y, r = Math.min(4, h);
+      const ultimo = i === g.length - 1;
+      const p = el("path", {d: `M${cx - ancho / 2},${H - pad.b} V${y + r} Q${cx - ancho / 2},${y} ${cx - ancho / 2 + r},${y} H${cx + ancho / 2 - r} Q${cx + ancho / 2},${y} ${cx + ancho / 2},${y + r} V${H - pad.b} Z`,
+        fill: "var(--serie-negocio)", "fill-opacity": ultimo ? 1 : 0.55, tabindex: 0}, s);
+      const [a, m] = x.key.split("-");
+      p.setAttribute("data-tip", `<b>${MESES[+m - 1]} ${a}</b>${ultimo ? " (en curso)" : ""}<br>Ventas netas: ${usd(x.net_usd)}<br>Margen: ${nf1.format(x.gross_margin_pct)} % · ${nf0.format(x.tickets)} ventas`);
+      if (g.length <= 12 || i % 2 === 0) texto(MESES[+m - 1], {x: cx, y: H - 8, "text-anchor": "middle"}, s);
+      if (x === mx || ultimo) texto(compacto(x.net_usd), {x: cx, y: y - 6, "text-anchor": "middle", fill: "var(--fg-2)"}, s);
+    });
+    cont.appendChild(s);
+    $("nota-ventas").textContent = "USD, últimos 12 meses; el mes en curso, resaltado";
+    $("tabla-ventas").innerHTML = `<table><thead><tr><th>Mes</th><th class="num">Ventas netas</th><th class="num">Beneficio bruto</th><th class="num">Margen</th><th class="num">Ventas</th></tr></thead><tbody>${
+      g.map((x) => `<tr><td>${x.key}</td><td class="num">${usd(x.net_usd)}</td><td class="num">${usd(x.gross_profit_usd)}</td><td class="num">${nf1.format(x.gross_margin_pct)} %</td><td class="num">${nf0.format(x.tickets)}</td></tr>`).join("")}</tbody></table>`;
+  }
+
+  // Barras horizontales ----------------------------------------------------------------------
+  function hbarras(id, items, valor, etiqueta, tipF) {
+    const cont = $(id);
+    if (!items.length) { cont.innerHTML = '<p class="nota">Sin datos.</p>'; return; }
+    const vals = items.map(valor).map((v) => v ?? 0), lo = Math.min(0, ...vals), hi = Math.max(0, ...vals), rango = (hi - lo) || 1;
+    const z = (-lo / rango) * 82;     // deja ~18 % libre para la etiqueta del valor
+    cont.innerHTML = items.map((it, i) => {
+      const v = vals[i], w = Math.abs(v) / rango * 82, neg = v < 0;
+      const izq = neg ? z - w : z;
+      return `<div class="hbarra" tabindex="0" data-tip="${esc(tipF(it))}"><span class="n">${esc(it.name)}</span>
+        <span class="t">${lo < 0 ? `<i class="z" style="left:${z}%"></i>` : ""}<i class="b ${neg ? "neg" : ""} ${v === 0 ? "cero-v" : ""}" style="left:${izq}%;width:${w}%"></i>
+        <i class="v" style="left:calc(${neg ? z : z + w}% + 6px)">${etiqueta(it)}</i></span></div>`;
+    }).join("");
+  }
+  const tipProd = (it) => `<b>${esc(it.name)}</b><br>${nf0.format(it.units)} u · ${usd(it.revenue_usd ?? it.net_usd)}<br>Margen: ${it.margin_pct == null ? "—" : nf1.format(it.margin_pct) + " %"}`;
+  hbarras("mas-vendidos", D.mas_vendidos || [], (x) => x.units, (x) => nf0.format(x.units) + " u", tipProd);
+  hbarras("menos-vendidos", D.menos_vendidos || [], (x) => x.units, (x) => nf0.format(x.units) + " u", tipProd);
+  const tipMargen = (it) => `<b>${esc(it.name)}</b><br>Margen: ${nf1.format(it.margin_pct)} % (antes ${it.margin_prev_period_pct == null ? "—" : nf1.format(it.margin_prev_period_pct) + " %"})<br>Beneficio: ${usd(it.gross_profit_usd, 2)} sobre ${usd(it.net_usd, 2)}<br>Coste medio: ${pct(it.avg_cost_change_pct)} · precio: ${pct(it.price_change_pct)}`;
+  hbarras("mas-rentables", D.mas_rentables || [], (x) => x.margin_pct, (x) => nf1.format(x.margin_pct) + " %", tipMargen);
+  hbarras("menos-rentables", D.menos_rentables || [], (x) => x.margin_pct, (x) => nf1.format(x.margin_pct) + " %", tipMargen);
+
+  // Categorías -------------------------------------------------------------------------------
+  (function categorias() {
+    const cats = (D.ventas_mes || {}).categorias || [], marg = {};
+    (D.rentabilidad_categorias || []).forEach((c) => { marg[c.key] = c; });
+    const filas = cats.slice().sort((a, b) => b.net_usd - a.net_usd);
+    $("categorias").innerHTML = `<table><thead><tr><th>Categoría</th><th class="num">Ventas</th><th class="num">Margen</th><th class="num">vs. mes anterior</th></tr></thead><tbody>${
+      filas.map((c) => { const m = marg[c.key] || {}, dm = m.margin_pct != null && m.margin_prev_period_pct != null ? m.margin_pct - m.margin_prev_period_pct : null;
+        return `<tr><td>${esc(c.key)}</td><td class="num">${usd(c.net_usd)}</td><td class="num">${c.gross_margin_pct == null ? "—" : nf1.format(c.gross_margin_pct) + " %"}</td><td class="num ${dm == null ? "" : dm >= 0 ? "sube-bien" : "baja-mal"}">${dm == null ? "—" : (dm > 0 ? "+" : "") + nf1.format(dm) + " pp"}</td></tr>`; }).join("")}</tbody></table>`;
+  })();
+
+  // Tasa -------------------------------------------------------------------------------------
+  function tasaGrafico() {
+    const cont = $("tasa"); cont.innerHTML = "";
+    const serie = (D.tasa || {}).serie || []; if (serie.length < 2) { cont.innerHTML = '<p class="nota">Sin serie de tasa.</p>'; return; }
+    const v = (D.tasa || {}).variacion || {};
+    $("nota-tasa").textContent = `informal (elTOQUE) · 7 días ${pct(v.d7)} · 30 días ${pct(v.d30)}`;
+    const W = Math.max(280, cont.clientWidth), H = 260, pad = {l: 44, r: 52, t: 10, b: 26};
+    const vals = serie.map((s) => s.usd_cup), ticks = limpios(Math.min(...vals), Math.max(...vals), 3), lo = ticks[0], hi = ticks[ticks.length - 1];
+    const X = (i) => pad.l + i * (W - pad.l - pad.r) / (serie.length - 1), Y = (val) => pad.t + (hi - val) / (hi - lo) * (H - pad.t - pad.b);
+    const s = svg(W, H); s.setAttribute("data-tip-zona", ""); s.setAttribute("role", "img"); s.setAttribute("aria-label", `Tasa USD a CUP de ${vals[0]} a ${vals[vals.length - 1]}`);
+    ticks.forEach((t) => { el("line", {x1: pad.l, x2: W - pad.r, y1: Y(t), y2: Y(t), stroke: "var(--grid)", "stroke-width": 1}, s); texto(nf0.format(t), {x: pad.l - 8, y: Y(t) + 4, "text-anchor": "end"}, s); });
+    [0, Math.floor(serie.length / 2), serie.length - 1].forEach((i) => texto(fecha(serie[i].date), {x: X(i), y: H - 6, "text-anchor": i === 0 ? "start" : i === serie.length - 1 ? "end" : "middle"}, s));
+    const pts = serie.map((d, i) => `${X(i).toFixed(1)},${Y(d.usd_cup).toFixed(1)}`);
+    el("path", {d: `M${pts[0]} L${pts.slice(1).join(" L")} L${X(serie.length - 1)},${H - pad.b} L${X(0)},${H - pad.b} Z`, fill: "var(--serie-3)", "fill-opacity": 0.10}, s);
+    el("path", {d: `M${pts.join(" L")}`, fill: "none", stroke: "var(--serie-3)", "stroke-width": 2, "stroke-linejoin": "round"}, s);
+    const u = serie.length - 1;
+    el("circle", {cx: X(u), cy: Y(vals[u]), r: 4, fill: "var(--serie-3)", stroke: "var(--surface)", "stroke-width": 2}, s);
+    texto(nf0.format(vals[u]), {x: X(u) + 8, y: Y(vals[u]) + 4, fill: "var(--fg-2)"}, s);
+    const guia = el("line", {y1: pad.t, y2: H - pad.b, stroke: "var(--axis)", visibility: "hidden"}, s);
+    el("rect", {x: pad.l, y: 0, width: W - pad.l - pad.r, height: H, fill: "transparent"}, s).addEventListener("pointermove", (e) => {
+      const r = s.getBoundingClientRect(), i = Math.max(0, Math.min(u, Math.round((e.clientX - r.left - pad.l) / ((W - pad.l - pad.r) / u))));
+      guia.setAttribute("x1", X(i)); guia.setAttribute("x2", X(i)); guia.setAttribute("visibility", "visible");
+      mostrarTip(`${fecha(serie[i].date)}: 1 USD = ${nf2.format(serie[i].usd_cup)} CUP`, e.clientX, e.clientY);
+    });
+    s.addEventListener("pointerleave", () => { guia.setAttribute("visibility", "hidden"); ocultarTip(); });
+    cont.appendChild(s);
+    const imp = (D.tasa || {}).impacto;
+    if (imp && imp.price_cup_start != null) cont.insertAdjacentHTML("beforeend", `<p class="nota">Un artículo de ${usd(imp.example_price_usd)} costaba ${nf0.format(imp.price_cup_start)} CUP el ${fecha(serie[0].date)} y hoy ${nf0.format(imp.price_cup_today)} CUP. ${esc(imp.note || "")}</p>`);
+  }
+
+  // Inventario -------------------------------------------------------------------------------
+  (function inventario() {
+    const inv = D.inventario || {}, t = inv.totals || {}, por = t.by_status || {};
+    $("estados").innerHTML = Object.keys(ESTADO).map((k) => chip(ESTADO[k][0] === "info" ? k : ESTADO[k][0], `${ESTADO[k][1]}: ${por[k] || 0}`, ESTADO[k][0])).join("");
+    $("nota-inv").textContent = `${usd(t.immobilized_value_usd)} inmovilizados de ${usd(t.total_stock_value_usd)} en stock`;
+    const items = (inv.items || []).slice(0, 12);
+    $("inventario").innerHTML = `<table><thead><tr><th>Producto</th><th>Estado</th><th class="num">Stock</th><th class="num">Cobertura</th><th class="num">Valor</th></tr></thead><tbody>${
+      items.map((i) => `<tr><td>${esc(i.name)}</td><td>${esc((ESTADO[i.status] || [0, i.status])[1])}</td><td class="num">${nf0.format(i.stock)}</td><td class="num">${i.coverage_days == null ? "—" : nf0.format(i.coverage_days) + " d"}</td><td class="num">${usd(i.stock_value_usd)}</td></tr>`).join("")}</tbody></table>`;
+  })();
+
+  // Alertas ----------------------------------------------------------------------------------
+  (function alertas() {
+    const a = D.alertas || {}, n = a.count_by_priority || {};
+    $("nota-alertas").textContent = `${nf0.format(n.urgent || 0)} urgentes · ${nf0.format(n.high || 0)} altas · ${nf0.format((n.medium || 0) + (n.low || 0))} medias o bajas`;
+    const ls = (a.alerts || []).filter((x) => x.priority === "urgent" || x.priority === "high").slice(0, 10);
+    $("alertas").innerHTML = ls.length ? ls.map((x) => { const [c, t] = PRIO_ALERTA[x.priority] || ["info", x.priority];
+      return `<div class="alerta"><div class="cab">${chip(c, t)}<b>${esc(x.title)}</b></div><p>${esc(x.detail || "")}</p></div>`; }).join("") : '<p class="nota">Sin alertas urgentes ni altas.</p>';
+  })();
+
+  // Calidad ----------------------------------------------------------------------------------
+  (function calidad() {
+    const c = D.calidad || {}, q = c.interno || {};
+    const conf = Object.entries(c.confianza_mercado || {}).map(([k, v]) => { const p = (D.productos || []).find((x) => x.sku === k); return `<li>${esc(p ? p.nombre : k)}: ${esc(v || "sin datos")}</li>`; }).join("");
+    const lim = new Set(); (D.productos || []).forEach((p) => ((p.mercado || {}).limitaciones || []).forEach((l) => lim.add(l)));
+    $("calidad").innerHTML = `
+      <div><h3>Negocio (Agente Interno)</h3><ul>
+        <li>Último dato: ${fechaHora(q.last_sale_at)} (hace ${q.freshness_minutes ?? "—"} min)</li>
+        ${(q.active_without_price || []).map((p) => `<li>${esc(p.name)}: activo sin precio</li>`).join("")}
+        <li>Descuadres de stock: ${q.stock_mismatch_count ?? "—"}</li></ul></div>
+      <div><h3>Mercado (Agente Externo)</h3><ul><li>Fuentes: ${esc((M.fuentes_mercado || []).join(", ") || "—")}</li>${conf}</ul></div>
+      <div><h3>Límites del análisis</h3><ul>${[...lim].slice(0, 4).map((l) => `<li>${esc(l)}</li>`).join("")}
+        <li>Las conversiones CUP↔USD usan la tasa informal de elTOQUE: son estimaciones.</li></ul>
+        ${(c.avisos || []).length ? `<h3>Avisos</h3><ul>${c.avisos.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}</div>`;
+    $("pie").textContent = `${M.proveedor} · Agente Central ${M.agente_central} · Generado ${fechaHora(M.generado)} (${TZ || "hora local"})` + (M.demo ? " · Negocio y mercado de demostración: las cifras de mercado son sintéticas." : "");
+  })();
+
+  function dibujar() { tendencias(); ventasMensuales(); tasaGrafico(); }
+  dibujar();
+  let t0; window.addEventListener("resize", () => { clearTimeout(t0); t0 = setTimeout(dibujar, 150); });
+})();
+</script>
+</body>
+</html>

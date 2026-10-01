@@ -1,0 +1,38 @@
+# Sistema completo en un VPS (fuera de Cuba: la API de Claude no está disponible desde Cuba).
+# Requiere los tres repositorios clonados uno al lado del otro:
+#   Agente-Central-Estudio-Mercado/   (este)
+#   Agente-Controlador-de-Negocio/    (Agente Interno)
+#   Agente-Controlador-de-Mercado/    (Agente Externo, se instala dentro de la imagen del Central)
+#
+#   docker compose up -d                          → solo el Central (modo demo o Interno desplegado aparte)
+#   docker compose --profile completo up -d       → sistema completo (Agente Interno + Agente Central)
+services:
+  agente-interno:
+    build: ../Agente-Controlador-de-Negocio
+    env_file: ../Agente-Controlador-de-Negocio/.env
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: "8080"
+      # El dueño habla con el bot del Agente Central: el Interno no arranca su propio bot.
+      TELEGRAM_BOT_TOKEN: ""
+    restart: unless-stopped
+    profiles: ["completo"]
+
+  agente-central:
+    build:
+      context: .
+      additional_contexts:
+        mercado: ../Agente-Controlador-de-Mercado
+    env_file: .env
+    environment:
+      API_HOST: 0.0.0.0
+      INTERNO_URL: http://agente-interno:8080/v1/consulta
+    ports:
+      - "127.0.0.1:8090:8090"      # publícalo detrás de un proxy HTTPS (Caddy/Nginx), nunca directamente
+    volumes:
+      - ./config:/app/config:ro
+      - datos-central:/app/datos
+    restart: unless-stopped
+
+volumes:
+  datos-central:

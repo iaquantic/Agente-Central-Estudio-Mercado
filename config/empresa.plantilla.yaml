@@ -1,0 +1,111 @@
+# Perfil de empresa del Agente Central — PLANTILLA DE PRODUCCIÓN.
+#
+# Para un cliente nuevo:  cp config/empresa.plantilla.yaml config/empresa.yaml
+#                         (en .env: EMPRESA_CONFIG=config/empresa.yaml)
+# Rellena lo marcado con «CAMBIAR». Los secretos (tokens, claves) NUNCA van aquí: van en .env.
+# Guía completa: docs/personalizacion.md
+
+empresa:
+  id: mercadoagentico         # CAMBIAR: identificador corto, sin espacios
+  nombre: MercadoAgentico     # CAMBIAR
+  descripcion: Comercio minorista de alimentos, electrodomésticos y energía (tienda física + web)   # CAMBIAR
+  pais: Cuba
+  zona_horaria: America/Havana
+  moneda: USD                 # moneda en la que el negocio fija sus precios
+  moneda_local: CUP
+
+# Identidad visual del panel. Por defecto, formato Quantic. Para marca blanca o co-marca,
+# cambia el logo y los colores; el resto del panel se adapta solo.
+marca:
+  proveedor: Quantic Data
+  logo: config/marca/quantic.svg
+  logo_cliente: null          # ruta a un SVG/PNG del cliente (opcional, se muestra junto al de Quantic)
+  colores:
+    primario: "#101063"       # azul noche Quantic
+    acento: "#8070E7"         # violeta Quantic
+    acento_fuerte: "#5C47E0"
+    suave: "#E2E1FF"
+  tipografias:
+    titulos: Space Grotesk
+    texto: Archivo
+
+# Agente Interno (control del negocio). Contrato: POST /v1/consulta v1.0
+interno:
+  modo: api                   # api | demo
+  url: http://agente-interno:8080/v1/consulta   # con docker compose; sin Docker, p. ej. http://127.0.0.1:8080/v1/consulta
+  token_env: ORQUESTADOR_TOKEN
+  timeout_s: 30
+  fixtures: demo/interno/fixtures.json
+
+# Agente Externo (Controlador de Mercado)
+mercado:
+  modo: motor                 # motor (análisis determinista, sin coste de modelo) | agente (el externo usa Claude)
+  # Fuentes en vivo. Cada ejecución guarda sus capturas (CONTROLADOR_CACHE_DIR) y con ellas se calculan las
+  # tendencias: aparecen a partir de 3 semanas con al menos una captura semanal.
+  # Condiciones de uso de cada sitio: README del Controlador de Mercado (Revolico pide autorización para uso comercial).
+  fuentes:
+    - tipo: web
+      nombre: revolico
+      opciones: {max_pages: 3}
+    - tipo: web
+      nombre: cuballama
+      opciones: {default_province: La Habana, channels: [mercado, envios]}
+    # - tipo: web
+    #   nombre: cubamax        # requiere Chromium (pip install "controlador-mercado[navegador]")
+  provincias: []              # vacío = todas; p. ej. [La Habana] para comparar solo con la zona del negocio
+  convertir_a: USD            # se convierte con la tasa elTOQUE que informa el Agente Interno
+  granularidad: week
+  dias_periodo: 7             # ventana de precios actuales
+  semanas_historial: 12       # ventana para tendencias
+  cache_horas: 12
+
+panel:
+  meses_historial: 12
+  top_n: 10
+  refresco_minutos: 60
+  titulo: Panel de estudio de mercado
+
+# Umbrales de las reglas de cruce negocio × mercado (docs/reglas_de_cruce.md)
+reglas:
+  margen_minimo_pct: 10        # por debajo, el margen se considera comprimido
+  diferencia_precio_pct: 8     # diferencia con la mediana del mercado que se considera relevante
+  variacion_tendencia_pct: 8   # variación del precio de mercado que se considera movimiento
+  cobertura_minima_dias: 7     # cobertura por debajo de la cual hay riesgo de rotura
+  dias_horizonte: 30           # horizonte para estimar el impacto económico
+
+telegram:
+  resumen_diario: "19:45"      # null para desactivar
+  alertas_urgentes: true
+  revisar_alertas_cada_min: 30
+  silencio: ["21:00", "08:00"]
+  max_alertas_dia: 3
+  limite_consultas_hora: 30
+
+modelo:
+  nombre: claude-opus-5-5
+  esfuerzo: medium
+
+# Hora congelada: SOLO para demostraciones. En producción, null.
+demo:
+  ahora: null
+
+# CAMBIAR: productos que el Agente Central vigila en el mercado (los SKU deben existir en el Agente Interno). Para cada SKU del negocio se describe cómo
+# buscarlo fuera (formato TargetProduct del Controlador de Mercado). Los productos no listados también
+# se pueden consultar por Telegram: el orquestador construye la búsqueda a partir de la ficha del producto.
+catalogo_vigilado:
+  - sku: GRA-010
+    mercado: {name: aceite de girasol, quantity: 1, unit: L, exclude_keywords: [motor]}
+  - sku: GRA-012
+    mercado: {name: leche en polvo, quantity: 1, unit: kg, exclude_keywords: [condensada, evaporada]}
+  - sku: GRA-013
+    mercado: {name: cafe molido, quantity: 250, unit: g, exclude_keywords: [cafetera]}
+  - sku: GRA-014
+    mercado: {name: huevos, pack_count: 30, exclude_keywords: [codorniz]}
+  - sku: GRA-001
+    mercado: {name: arroz, quantity: 1, unit: kg, exclude_keywords: [arrocera, pollo]}
+  - sku: CAR-001
+    mercado: {name: pollo troceado, quantity: 10, unit: lb, exclude_keywords: [combo]}
+  - sku: CLI-001
+    mercado: {name: ventilador pedestal, keywords: ["18"], exclude_keywords: [recargable, techo, mesa]}
+  - sku: ELE-003
+    mercado: {name: freidora de aire, quantity: 5, unit: L}

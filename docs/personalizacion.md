@@ -18,15 +18,17 @@ El código es el mismo para todos los clientes. Lo que cambia está en dos sitio
 ## 2. Perfil de empresa
 
 ```bash
-cp config/empresa.demo.yaml config/empresa.yaml
+cp config/empresa.plantilla.yaml config/empresa.yaml
 ```
+La plantilla ya viene en modo producción (`interno.modo: api`, `demo.ahora: null`) y con Revolico y Cuballama como fuentes.
+Lo que hay que cambiar está marcado con `CAMBIAR`.
 
 | Sección | Qué ajustar |
 |---|---|
 | `empresa` | `id` (corto, sin espacios: se usa en rutas de datos), `nombre`, `descripcion`, `zona_horaria`, monedas |
 | `marca` | Por defecto, formato Quantic. Para co-marca, añade `logo_cliente` (SVG o PNG). Para marca blanca, cambia `proveedor`, `logo`, `colores` y `tipografias` (nombres de Google Fonts) |
 | `interno` | `modo: api`, `url` del Agente Interno y nombre de la variable con su token (`token_env`) |
-| `mercado` | `fuentes` (archivos autorizados o `web`: revolico, cuballama, cubamax, cubatel), `provincias`, ventanas de análisis, `modo` |
+| `mercado` | `fuentes` (archivos autorizados o `web`: revolico, cuballama, cubamax, cubatel, con `opciones` del adaptador, p. ej. `default_province` de Cuballama), `provincias`, ventanas de análisis, `modo` |
 | `catalogo_vigilado` | Los SKU que se siguen en el mercado y cómo buscarlos (ver abajo) |
 | `reglas` | Umbrales de las propuestas ([reglas_de_cruce.md](reglas_de_cruce.md)) |
 | `telegram` | Hora del resumen diario, alertas urgentes, silencio nocturno, máximo diario, límite de consultas |
@@ -73,7 +75,8 @@ Controlador de Mercado (`controlador-mercado analizar --producto '{...}' --web r
 cp .env.example .env
 ```
 Rellena `EMPRESA_CONFIG`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_USUARIOS`, `ANTHROPIC_API_KEY`, `INTERNO_MODO=api`,
-`INTERNO_URL`, `ORQUESTADOR_TOKEN`, `PANEL_TOKEN` y, si el panel se publica, `PANEL_URL_PUBLICA`.
+`INTERNO_URL`, `ORQUESTADOR_TOKEN` y `PANEL_TOKEN`. Deja `PANEL_URL_PUBLICA` vacío: el bot envía el panel como archivo HTML.
+Detalle de cada clave en el README ("Dónde van las claves").
 
 ## 4. Puesta en marcha
 

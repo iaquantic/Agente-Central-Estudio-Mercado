@@ -55,13 +55,16 @@ class Servicio:
         self._tasa = (time.monotonic(), fx, d.get("series") or [])
         return fx, self._tasa[2]
 
-    async def panel(self, *, forzar: bool = False) -> dict:
-        """Último panel; se regenera si ha caducado (refresco_minutos) o si se fuerza."""
+    async def panel(self, *, forzar: bool = False, forzar_mercado: bool = False) -> dict:
+        """Último panel; se regenera si ha caducado (refresco_minutos) o si se fuerza.
+
+        `forzar` rehace el panel con datos frescos del negocio; los análisis de mercado salen de su caché
+        (`mercado.cache_horas`) para no consultar las webs en cada refresco. `forzar_mercado` ignora esa caché."""
         caducidad = float(self.cfg["panel"]["refresco_minutos"]) * 60
         async with self._panel_lock:
-            if forzar or self._panel is None or time.monotonic() - self._panel_t > caducidad:
+            if forzar or forzar_mercado or self._panel is None or time.monotonic() - self._panel_t > caducidad:
                 inicio = time.monotonic()
-                self._panel = await self.constructor.construir(forzar_mercado=forzar)
+                self._panel = await self.constructor.construir(forzar_mercado=forzar_mercado)
                 self._panel_t = time.monotonic()
                 self._guardar(self._panel)
                 await self.registro.evento("panel", {"ms": int((time.monotonic() - inicio) * 1000),

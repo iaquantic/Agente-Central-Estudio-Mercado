@@ -11,7 +11,7 @@ git clone https://github.com/iaquantic/Agente-Controlador-de-Negocio
 git clone https://github.com/iaquantic/Agente-Controlador-de-Mercado
 cd Agente-Central-Estudio-Mercado
 cp .env.example .env                          # INTERNO_MODO=api, tokens y claves
-cp config/empresa.demo.yaml config/empresa.yaml && $EDITOR config/empresa.yaml   # demo.ahora: null
+cp config/empresa.plantilla.yaml config/empresa.yaml && $EDITOR config/empresa.yaml   # rellenar lo marcado CAMBIAR
 #   en .env: EMPRESA_CONFIG=config/empresa.yaml
 #   en ../Agente-Controlador-de-Negocio/.env: DB_URL_AGENTE, ORQUESTADOR_TOKEN (el mismo), ANTHROPIC_API_KEY…
 docker compose --profile completo up -d --build
@@ -19,11 +19,14 @@ docker compose exec agente-central python -m agente_central comprobar
 ```
 
 - El Agente Interno queda en la red interna de Docker (`http://agente-interno:8080`), sin puerto publicado.
-- El panel escucha en `127.0.0.1:8090`. Publícalo detrás de un proxy HTTPS (Caddy, Nginx) y configura `PANEL_TOKEN` y
-  `PANEL_URL_PUBLICA`; el bot envía el enlace con el token. Sin proxy, `/panel` en Telegram envía el HTML como archivo.
+- El dueño recibe el panel **como archivo HTML por Telegram** (`/panel` y con el resumen diario): no hace falta
+  publicar ninguna web. El puerto `127.0.0.1:8090` solo sirve la API local (`/api/panel`, `/api/preguntar`). Si algún
+  día se quiere un enlace, publícalo detrás de un proxy HTTPS con `PANEL_TOKEN` y `PANEL_URL_PUBLICA`.
 - Datos persistentes en el volumen `datos-central`: último panel, caché de análisis de mercado, registro de
-  interacciones (`registro.jsonl`) y alertas ya enviadas. El histórico de capturas web del Controlador de Mercado se
-  guarda en `CONTROLADOR_CACHE_DIR` (móntalo en un volumen si se usan fuentes web, para que haya tendencias).
+  interacciones (`registro.jsonl`), alertas ya enviadas y el histórico de capturas de Revolico y Cuballama
+  (`CONTROLADOR_CACHE_DIR`). Ese histórico es lo que permite calcular tendencias: no borres el volumen.
+- Las webs se consultan como mucho una vez cada `mercado.cache_horas` (12 h por defecto) por producto, con 5 s entre
+  peticiones y respetando robots.txt. El refresco horario del panel reutiliza esos análisis.
 - Cubamax necesita Chromium (`pip install controlador-mercado[navegador]` + `playwright install chromium` en la imagen);
   no está incluido por defecto para mantener la imagen ligera.
 

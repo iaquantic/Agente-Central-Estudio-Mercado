@@ -157,16 +157,21 @@ class BotTelegram:
         if await self._autorizado(update):
             await update.effective_message.reply_text(AYUDA, parse_mode=ParseMode.HTML)
 
-    async def _panel(self, chat_id: int) -> None:
+    async def _documento_panel(self, chat_id: int) -> None:
+        """Envía el panel como archivo HTML autocontenido (se abre en el navegador del móvil, también sin conexión)."""
         await self.app.bot.send_chat_action(chat_id, ChatAction.UPLOAD_DOCUMENT)
-        contenido = await self.s.panel_html()
         p = await self.s.panel()
+        contenido = await self.s.panel_html()
         nombre = f"panel_{self.s.cfg.empresa['id']}_{p['meta']['periodo']['hasta']}.html"
         url = self.url_panel()
         pie = f"\n\nTambién en: {html.escape(url)}" if url else ""
         await self.app.bot.send_document(chat_id, InputFile(io.BytesIO(contenido.encode("utf-8")), filename=nombre),
-                                         caption=f"📈 Panel de {html.escape(self.s.cfg.nombre)}. Ábrelo en el navegador.{pie}",
+                                         caption=f"📈 Panel de {html.escape(self.s.cfg.nombre)}. Ábrelo con el navegador.{pie}",
                                          parse_mode=ParseMode.HTML)
+
+    async def _panel(self, chat_id: int) -> None:
+        await self._documento_panel(chat_id)
+        p = await self.s.panel()
         await self._enviar(chat_id, "💡 <b>Decisiones propuestas</b>\n\n" + propuestas_html(p["propuestas"], limite=3))
 
     async def cmd_panel(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -236,6 +241,8 @@ class BotTelegram:
     async def _job_resumen(self, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             await self.enviar_a_todos(await self.avisador.resumen_diario(self.url_panel()), BOTONES_INICIO)
+            for u in self.usuarios:                     # el panel del día, como archivo HTML
+                await self._documento_panel(u)
         except Exception:
             log.exception("Fallo del resumen diario")
 

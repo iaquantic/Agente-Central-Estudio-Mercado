@@ -38,8 +38,9 @@ Detalle en [docs/arquitectura.md](docs/arquitectura.md).
 **Bot de Telegram**, punto único de contacto del dueño:
 - Texto libre. *"¿Cómo se está moviendo el aceite en el mercado?"* → Agente Externo. *"¿Cómo va mi negocio de pollo?"* →
   Agente Interno. *"¿Estoy caro con los ventiladores? ¿Qué hago?"* → cruce de ambos con propuesta.
-- Comandos: `/panel` (envía el panel), `/oportunidades`, `/negocio`, `/mercado <producto>`, `/producto <producto>`, `/ayuda`.
-- Resumen diario (negocio + decisiones) y alertas urgentes del negocio, con anti-repetición y horas de silencio.
+- Comandos: `/panel` (envía el panel como archivo HTML, que se abre en el navegador del móvil), `/oportunidades`, `/negocio`, `/mercado <producto>`, `/producto <producto>`, `/ayuda`.
+- Resumen diario (negocio + decisiones + panel en HTML adjunto) y alertas urgentes del negocio, con anti-repetición y horas de silencio.
+- Es el **único bot** del sistema: el Agente Interno se despliega sin el suyo.
 
 **Principios**
 - Las cifras las calculan siempre los subagentes o reglas deterministas; el modelo nunca inventa números.
@@ -72,10 +73,29 @@ python -m agente_central preguntar "¿Cómo se está moviendo el aceite en el me
 python -m agente_central servir          # bot + panel web en http://127.0.0.1:8090/panel + tareas programadas
 ```
 
+## Dónde van las claves
+
+Las claves **nunca** van en el repositorio, en el perfil YAML ni en un chat. Van en un archivo `.env` en la máquina
+donde corre el Agente Central (el VPS), junto al código:
+
+```bash
+cp .env.example .env
+nano .env          # o cualquier editor
+```
+
+| Variable | Qué es | Dónde se obtiene |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Clave de Claude (`sk-ant-…`) | console.anthropic.com → Settings → API keys |
+| `TELEGRAM_BOT_TOKEN` | Token del bot (`123456789:AAH…`) | @BotFather → `/newbot` |
+| `TELEGRAM_USUARIOS` | IDs numéricos autorizados, separados por comas | Cada persona escribe a @userinfobot |
+| `ORQUESTADOR_TOKEN` | Secreto compartido con el Agente Interno (el mismo en ambos `.env`) | `python -c "import secrets;print(secrets.token_urlsafe(32))"` |
+
+`.env` está en `.gitignore`. Protégelo con `chmod 600 .env`. Con Docker, `docker compose` lo lee solo (`env_file`).
+
 ## Para una empresa nueva
 
 Todo lo que cambia de un cliente a otro está en **un archivo**: `config/empresa.yaml` (copia de
-[config/empresa.demo.yaml](config/empresa.demo.yaml)). Marca, catálogo vigilado, fuentes de mercado, umbrales de las
+[config/empresa.plantilla.yaml](config/empresa.plantilla.yaml), que ya trae Revolico y Cuballama como fuentes de mercado). Marca, catálogo vigilado, fuentes de mercado, umbrales de las
 reglas, horarios de los avisos y modelo. Los secretos van en `.env`. Paso a paso en
 [docs/personalizacion.md](docs/personalizacion.md); despliegue en [docs/despliegue.md](docs/despliegue.md).
 

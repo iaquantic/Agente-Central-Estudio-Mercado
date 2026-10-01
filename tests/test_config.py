@@ -64,3 +64,12 @@ def test_perfiles_invalidos(tmp_path, cambios, mensaje):
 def test_perfil_inexistente(tmp_path):
     with pytest.raises(ErrorConfig):
         Config.cargar(tmp_path / "no.yaml", entorno={})
+
+
+def test_plantilla_de_produccion():
+    from agente_central.externo import construir_registro
+    c = Config.cargar(RAIZ / "config" / "empresa.plantilla.yaml", entorno={"ORQUESTADOR_TOKEN": "x"})
+    assert c["interno"]["modo"] == "api" and c.ahora_fija is None
+    reg = construir_registro(c["mercado"]["fuentes"])
+    assert [a.source_id for a in reg.adapters] == ["revolico", "cuballama"]
+    assert reg.adapters[1].inner.channels == ("mercado", "envios")

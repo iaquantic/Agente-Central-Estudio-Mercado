@@ -62,3 +62,18 @@ async def test_cache_de_mercado_en_disco(cfg, tmp_path):
     m2 = ClienteMercado(cfg, Servicio(cfg).reloj, directorio_cache=tmp_path)
     m2.registro.fetch_all = lambda *a, **k: pytest.fail("debería usar la caché")
     assert (await m2.analizar({"name": "arroz", "quantity": 1, "unit": "kg"}, fx=fx))["analysis_id"] == a["analysis_id"]
+
+
+async def test_analisis_incompleto_no_se_guarda_en_disco(cfg, tmp_path):
+    from controlador_mercado.sources import SourceAdapter, SourceRegistry
+
+    class Vacia(SourceAdapter):
+        source_id, source_name = "vacia", "Vacía"
+
+        def fetch(self, target, since, until):
+            return []
+
+    m = ClienteMercado(cfg, Servicio(cfg).reloj, registro=SourceRegistry([Vacia()]), directorio_cache=tmp_path)
+    a = await m.analizar({"name": "arroz"}, fx=None)
+    assert a["sources"][0]["status"] == "vacia"
+    assert list(tmp_path.glob("*.json")) == []          # no se fija un resultado vacío durante 12 h

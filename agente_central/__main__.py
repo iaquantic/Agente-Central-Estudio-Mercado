@@ -58,7 +58,7 @@ async def cmd_comprobar(args) -> int:
 async def cmd_panel(args) -> int:
     from .panel_html import renderizar
     s = _servicio(args)
-    p = await s.panel(forzar=args.forzar)
+    p = await s.panel(forzar_mercado=args.forzar)
     salida = Path(args.salida)
     if args.json:
         salida.write_text(json.dumps(p, ensure_ascii=False, indent=2, default=str), encoding="utf-8")

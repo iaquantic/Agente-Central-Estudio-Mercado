@@ -28,30 +28,33 @@ from .config import ruta
 from .tiempo import Reloj
 
 log = logging.getLogger(__name__)
+CACHE_INCOMPLETO_S = 15 * 60      # análisis sin precios o con fuentes caídas/vacías: reintentar pronto
 CAMPOS_PRODUCTO = ("name", "brand", "model", "variant", "quantity", "unit", "pack_count", "condition", "keywords",
                    "exclude_keywords", "provinces")
 
 
 def construir_registro(fuentes: list[dict]) -> SourceRegistry:
+    """Fuentes del perfil. Las web admiten `opciones` que se pasan al adaptador
+    (p. ej. cuballama: default_province, channels, max_pages; revolico: max_pages)."""
     reg = SourceRegistry()
     for f in fuentes:
         if f["tipo"] == "archivo":
             reg.add(JsonFileSource(ruta(f["ruta"]), source_id=f.get("id")))
             continue
         from controlador_mercado.adapters.store import RecordingSource    # importación diferida: dependencias web
-        nombre = f["nombre"]
+        nombre, op = f["nombre"], dict(f.get("opciones") or {})
         if nombre == "revolico":
             from controlador_mercado.adapters import RevolicoSource
-            reg.add(RecordingSource(RevolicoSource()))
+            reg.add(RecordingSource(RevolicoSource(**op)))
         elif nombre == "cuballama":
             from controlador_mercado.adapters import CuballamaSource
-            reg.add(RecordingSource(CuballamaSource()))
+            reg.add(RecordingSource(CuballamaSource(**op)))
         elif nombre == "cubamax":
             from controlador_mercado.adapters import CubamaxSource
-            reg.add(RecordingSource(CubamaxSource()))
+            reg.add(RecordingSource(CubamaxSource(**op)))
         elif nombre == "cubatel":
             from controlador_mercado.adapters import CubatelSource
-            reg.add(CubatelSource())
+            reg.add(CubatelSource(**op))
     return reg
 
 
@@ -61,6 +64,13 @@ def limpiar_producto(producto: dict) -> dict:
     if not str(p.get("name", "")).strip():
         raise ValueError("El producto de mercado necesita 'name'.")
     return p
+
+
+def completo(analisis: dict) -> bool:
+    """Un análisis se guarda en caché larga solo si hay precios válidos y todas las fuentes respondieron con datos."""
+    fuentes = analisis.get("sources") or []
+    precios = (analisis.get("analysis_period") or {}).get("valid_price_observation_count") or 0
+    return precios > 0 and bool(fuentes) and all(f.get("status") == "ok" for f in fuentes)
 
 
 def tasas_desde_fx(fx: dict | None) -> list[ExchangeRate]:
@@ -127,7 +137,7 @@ class ClienteMercado:
         clave = self._clave(producto, fx)
         if not forzar:
             en_memoria = self._cache.get(clave)
-            if en_memoria and time.monotonic() - en_memoria[0] < self.cache_s:
+            if en_memoria and time.monotonic() - en_memoria[0] < (self.cache_s if completo(en_memoria[1]) else CACHE_INCOMPLETO_S):
                 return en_memoria[1]
             en_disco = self._leer_disco(clave)
             if en_disco:
@@ -135,7 +145,7 @@ class ClienteMercado:
                 return en_disco
         res = await asyncio.to_thread(self._analizar_sync, producto, fx)
         self._cache[clave] = (time.monotonic(), res)
-        if self.directorio_cache:
+        if self.directorio_cache and completo(res):
             (self.directorio_cache / f"{clave}.json").write_text(json.dumps(res, ensure_ascii=False, default=str),
                                                                  encoding="utf-8")
         return res

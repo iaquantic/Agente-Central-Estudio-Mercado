@@ -40,7 +40,12 @@ class Servicio:
 
     @property
     def orquestador(self):
-        """Se crea al primer uso: el panel y la web funcionan sin clave de Claude."""
+        """Se crea al primer uso: el panel y la web funcionan sin clave de Claude.
+
+        Devuelve None si Claude está desactivado (sin ANTHROPIC_API_KEY o CLAUDE_ACTIVO=0): así es imposible
+        hacer llamadas a la API por accidente. Con un cliente inyectado (pruebas) siempre está activo."""
+        if self._orquestador is None and not self.cfg.claude_activo and self._cliente_claude is None:
+            return None
         if self._orquestador is None:
             from .herramientas import Ejecutor
             from .orquestador import Orquestador

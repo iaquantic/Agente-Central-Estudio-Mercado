@@ -50,7 +50,7 @@ async def cmd_comprobar(args) -> int:
         print(f"  {'✓' if nombre else '✗'} {sku}: {nombre or 'no existe en el negocio'} → mercado «{p['mercado']['name']}»")
         ok = ok and bool(nombre)
     print(f"Telegram: {'configurado' if cfg.telegram_token else 'sin token'} · usuarios autorizados: {len(cfg.telegram_usuarios)}")
-    print(f"Claude: {'ANTHROPIC_API_KEY presente' if os.environ.get('ANTHROPIC_API_KEY') else 'sin ANTHROPIC_API_KEY (puede haber perfil de ant)'} · modelo {cfg['modelo']['nombre']}")
+    print(f"Claude: {'activo' if cfg.claude_activo else 'DESACTIVADO (texto libre sin respuesta del modelo)'} · modelo {cfg['modelo']['nombre']}")
     await s.cerrar()
     return 0 if ok else 1
 
@@ -73,6 +73,9 @@ async def cmd_panel(args) -> int:
 
 async def cmd_preguntar(args) -> int:
     s = _servicio(args)
+    if s.orquestador is None:
+        print("Claude está desactivado: falta ANTHROPIC_API_KEY o CLAUDE_ACTIVO=0.", file=sys.stderr)
+        return 2
     r = await s.orquestador.responder("cli", " ".join(args.pregunta), canal="cli", conservar=False)
     print(r.texto)
     if args.traza:

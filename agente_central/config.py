@@ -74,6 +74,7 @@ class Config:
     panel_url_publica: str | None = None
     api_host: str = "127.0.0.1"
     api_port: int = 8090
+    claude_activo: bool = True        # False: ninguna llamada a la API de Anthropic (texto libre desactivado)
     directorio_datos: Path = field(default_factory=lambda: RAIZ / "datos")
 
     # Accesos cómodos ---------------------------------------------------------------------------
@@ -126,6 +127,9 @@ class Config:
             panel_url_publica=(env.get("PANEL_URL_PUBLICA") or "").rstrip("/") or None,
             api_host=env.get("API_HOST") or "127.0.0.1",
             api_port=int(env.get("API_PORT") or 8090),
+            # Claude se usa solo si hay clave y no se ha desactivado expresamente (CLAUDE_ACTIVO=0).
+            claude_activo=bool(env.get("ANTHROPIC_API_KEY")) and (env.get("CLAUDE_ACTIVO", "1").strip().lower()
+                                                                  not in ("0", "no", "false", "off")),
             directorio_datos=Path(env.get("DIRECTORIO_DATOS") or RAIZ / "datos" / datos["empresa"].get("id", "empresa")),
         )
         cfg.validar()

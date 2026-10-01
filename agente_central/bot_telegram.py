@@ -45,6 +45,9 @@ AYUDA = ("<b>Comandos</b>\n"
          "/ayuda · esta ayuda\n\n"
          "<i>Solo consulto y propongo: no cambio precios, stock ni pedidos.</i>")
 
+SIN_CLAUDE = ("Ahora mismo las preguntas en texto libre están desactivadas. Puedes usar:\n"
+              "/panel · panel con gráficos\n/oportunidades · decisiones propuestas\n/negocio · cómo va el negocio hoy")
+
 BOTONES_INICIO = {"📈 Panel": "panel", "💡 Oportunidades": "oportunidades", "🏪 Mi negocio hoy": "negocio"}
 
 
@@ -131,8 +134,14 @@ class BotTelegram:
 
     async def _consultar(self, update: Update, pregunta: str, *, entrada: str | None = None) -> None:
         chat_id = update.effective_chat.id
+        orquestador = self.s.orquestador
+        if orquestador is None:
+            await self._enviar(chat_id, html_telegram(SIN_CLAUDE), BOTONES_INICIO)
+            await self.s.registro.interaccion(canal="telegram", usuario_id=update.effective_user.id, entrada=entrada or pregunta,
+                                              respuesta=SIN_CLAUDE, estado="sin_claude")
+            return
         await self.app.bot.send_chat_action(chat_id, ChatAction.TYPING)
-        r = await self.s.orquestador.responder(f"tg:{chat_id}", pregunta, canal="telegram")
+        r = await orquestador.responder(f"tg:{chat_id}", pregunta, canal="telegram")
         await self._enviar(chat_id, html_telegram(r.texto))
         await self.s.registro.interaccion(canal="telegram", usuario_id=update.effective_user.id, entrada=entrada or pregunta,
                                           respuesta=r.texto, estado=r.estado, herramientas=r.herramientas,

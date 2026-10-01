@@ -76,3 +76,19 @@ async def test_analisis_incompleto_no_se_guarda_en_disco(cfg, tmp_path):
     a = await m.analizar({"name": "arroz"}, fx=None)
     assert a["sources"][0]["status"] == "vacia"
     assert list((tmp_path / "c").glob("*.json")) == []          # no se fija un resultado vacío durante 12 h
+
+
+async def test_sin_claude_no_se_crea_el_orquestador_y_el_bot_lo_dice(tmp_path):
+    s = crear_servicio(cargar(tmp_path, CLAUDE_ACTIVO="0", ANTHROPIC_API_KEY="sk-ant-x"), tmp_path)
+    assert s.orquestador is None
+    assert crear_servicio(cargar(tmp_path), tmp_path).orquestador is None          # sin clave, tampoco
+    bot = BotTelegram(s, "123456:ABCDEF", (42,))
+    enviados = []
+
+    async def enviar(chat_id, texto, botones=None):
+        enviados.append(texto)
+
+    bot._enviar = enviar
+    upd = NS(effective_chat=NS(id=42), effective_user=NS(id=42))
+    await bot._consultar(upd, "¿cómo va el aceite?")
+    assert "desactivadas" in enviados[0] and "/panel" in enviados[0]

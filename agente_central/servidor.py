@@ -53,6 +53,8 @@ def crear_app(servicio) -> FastAPI:
     @app.post("/api/preguntar")
     async def preguntar(cuerpo: Pregunta, t: str | None = Query(default=None), authorization: str | None = Header(default=None)):
         autorizar(authorization, t)
+        if servicio.orquestador is None:
+            raise HTTPException(status_code=503, detail="Claude está desactivado (sin ANTHROPIC_API_KEY o CLAUDE_ACTIVO=0).")
         r = await servicio.orquestador.responder(f"api:{cuerpo.conversacion or 'unica'}", cuerpo.pregunta, canal="cli",
                                                  conservar=bool(cuerpo.conversacion))
         await servicio.registro.interaccion(canal="api", usuario_id="api", entrada=cuerpo.pregunta, respuesta=r.texto,

@@ -90,7 +90,8 @@ class BotTelegram:
         tg = servicio.cfg["telegram"]
         self.limite = LimiteUso(int(tg["limite_consultas_hora"]))
         self.avisador = Avisador(servicio, servicio.cfg.directorio_datos / "alertas_enviadas.json")
-        self.app = Application.builder().token(token).build()
+        # Mensajes en paralelo: un /panel que espera al estudio del día no bloquea los demás comandos.
+        self.app = Application.builder().token(token).concurrent_updates(True).build()
         self._handlers()
 
     # Autorización -------------------------------------------------------------------------------
@@ -204,9 +205,9 @@ class BotTelegram:
 
     async def _documento_panel(self, chat_id: int) -> None:
         """Envía el panel como archivo HTML autocontenido (se abre en el navegador del móvil, también sin conexión)."""
-        if not self.s.panel_de_hoy():
-            await self._enviar(chat_id, "⏳ Preparando el estudio de hoy (negocio + mercado). Tarda unos minutos; "
-                                        "después, el panel de hoy sale al momento.")
+        if not self.s.panel_vigente():
+            await self._enviar(chat_id, f"⏳ Preparando el estudio de las {self.s.turno_actual():%H:%M} (negocio + mercado). Tarda unos minutos; "
+                                        "después, el panel de este turno sale al momento.")
         await self.app.bot.send_chat_action(chat_id, ChatAction.UPLOAD_DOCUMENT)
         p = await self.s.panel()
         contenido = await self.s.panel_html()
@@ -229,6 +230,8 @@ class BotTelegram:
                                               respuesta="panel enviado", estado="ok")
 
     async def _oportunidades(self, chat_id: int) -> None:
+        if not self.s.panel_vigente():
+            await self._enviar(chat_id, f"⏳ Preparando el estudio de las {self.s.turno_actual():%H:%M} (negocio + mercado). Tarda unos minutos.")
         p = await self.s.panel()
         await self._enviar(chat_id, "💡 <b>Decisiones propuestas</b>\n\n" + propuestas_html(p["propuestas"], limite=6, dinero=dinero_de_panel(p)))
 
@@ -318,7 +321,7 @@ class BotTelegram:
             log.exception("Fallo de la revisión de alertas")
 
     async def _job_panel(self, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Hace el estudio del día si aún no está hecho (así el primer /panel de la mañana es inmediato)."""
+        """Hace el estudio del turno si aún no está hecho (así el /panel siguiente es inmediato)."""
         try:
             await self.s.panel()
         except Exception:
@@ -330,6 +333,6 @@ class BotTelegram:
             jq.run_daily(self._job_resumen, time=_hora(tg["resumen_diario"]).replace(tzinfo=zona), name="resumen")
         if tg.get("alertas_urgentes"):
             jq.run_repeating(self._job_alertas, interval=int(tg["revisar_alertas_cada_min"]) * 60, first=60, name="alertas")
-        jq.run_daily(self._job_panel, time=_hora(self.s.cfg["panel"]["hora_estudio"]).replace(tzinfo=zona), name="estudio")
-        if self.s.reloj_estudio.ahora().time() >= _hora(self.s.cfg["panel"]["hora_estudio"]):
-            jq.run_once(self._job_panel, when=5, name="estudio_inicio")   # arranque tras la hora del estudio
+        for h in self.s.cfg["panel"]["horas_estudio"]:          # un estudio por turno (08:00 y 16:00 por defecto)
+            jq.run_daily(self._job_panel, time=_hora(h).replace(tzinfo=zona), name=f"estudio {h}")
+        jq.run_once(self._job_panel, when=5, name="estudio_inicio")       # al arrancar, si falta el del turno actual

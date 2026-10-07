@@ -58,7 +58,7 @@ async def test_pregunta_de_mercado_va_al_agente_externo(servicio):
     assert kw["model"] == "claude-sonnet-5-5" and kw["fallbacks"] == "default"
     assert kw["system"][0]["cache_control"] == {"type": "ephemeral"}
     assert "GRA-010" in kw["system"][0]["text"] and "MercadoAgentico" in kw["system"][0]["text"]
-    assert "[Ahora: miércoles 2026-09-30 11:30" in kw["messages"][0]["content"]
+    assert "Los datos del negocio son de demostración y llegan hasta el 2026-09-30 11:30" in kw["messages"][0]["content"]
 
 
 async def test_herramientas_en_paralelo_y_negocio_al_interno(servicio):

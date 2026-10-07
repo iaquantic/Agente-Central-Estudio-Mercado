@@ -80,9 +80,19 @@ def _texto(contenido: list[Any]) -> str:
 
 
 class Orquestador:
-    def __init__(self, cfg, ejecutor: Ejecutor, reloj: Reloj, *, cliente: Any | None = None, fallbacks: bool = True):
+    def marca(self) -> str:
+        """Fecha y hora reales; en el modo demo, también hasta cuándo llegan los datos del negocio de prueba."""
+        m = self.reloj_real.marca()
+        if self.reloj.ahora_fija is not None:
+            m = m[:-1] + (f". Los datos del negocio son de demostración y llegan hasta el {self.reloj.ahora():%Y-%m-%d %H:%M};"
+                          " el mercado y la tasa son de hoy.]")
+        return m
+
+    def __init__(self, cfg, ejecutor: Ejecutor, reloj: Reloj, *, cliente: Any | None = None, fallbacks: bool = True,
+                 reloj_real: Reloj | None = None):
         self.ejecutor = ejecutor
-        self.reloj = reloj
+        self.reloj = reloj                     # el del negocio (congelado en el modo demo)
+        self.reloj_real = reloj_real or reloj  # el de hoy (mercado, tasa)
         self.modelo = cfg["modelo"]["nombre"]
         self.esfuerzo = cfg["modelo"]["esfuerzo"]
         self.fallbacks = fallbacks
@@ -119,7 +129,7 @@ class Orquestador:
         inicio = time.monotonic()
         conv = self._conversacion(clave) if conservar else _Conversacion()
         mensajes = conv.mensajes
-        mensajes.append({"role": "user", "content": f"{self.reloj.marca()}\n{texto}"})
+        mensajes.append({"role": "user", "content": f"{self.marca()}\n{texto}"})
         resp = Respuesta(texto="")
         tokens = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
         try:

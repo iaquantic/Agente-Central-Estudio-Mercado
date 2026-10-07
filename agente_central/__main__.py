@@ -49,6 +49,12 @@ async def cmd_comprobar(args) -> int:
         nombre = (datos(f) or {}).get("name")
         print(f"  {'✓' if nombre else '✗'} {sku}: {nombre or 'no existe en el negocio'} → mercado «{p['mercado']['name']}»")
         ok = ok and bool(nombre)
+    td = await s.tasa_dia.obtener()
+    if td:
+        print(f"Tasa del día: 1 USD = {td['usd_cup']:g} CUP · {td.get('fuente')} {td.get('fecha') or ''} {td.get('hora') or ''}".rstrip())
+    else:
+        print("Tasa del día: ✗ " + ("falta ELTOQUE_API_KEY" if not cfg.eltoque_api_key else "elTOQUE no responde")
+              + " (se usará la del Agente Interno)")
     print(f"Telegram: {'configurado' if cfg.telegram_token else 'sin token'} · usuarios autorizados: {len(cfg.telegram_usuarios)}")
     print(f"Claude: {'activo' if cfg.claude_activo else 'DESACTIVADO (texto libre sin respuesta del modelo)'} · modelo {cfg['modelo']['nombre']}")
     await s.cerrar()

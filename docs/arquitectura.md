@@ -55,9 +55,10 @@ el modelo redacta con las marcas 📊 💡 ❔ → filtro de salida (sin SQL, cl
 
 **Panel** — 12 consultas al Agente Interno en paralelo + por cada producto vigilado: ficha e historial (Interno),
 análisis de mercado (Externo) y cruce → JSON (`docs/contrato_panel.md`) → HTML autocontenido con la marca del perfil.
-**Un estudio al día**: se hace a `panel.hora_estudio` (o con el primer `/panel` del día, lo que llegue antes), siempre con
-consultas nuevas a las webs de mercado, y se reutiliza el resto del día, también tras reiniciar el servicio (`panel.json`).
-`POST /api/panel/actualizar` lo rehace a mano con datos frescos del negocio y el mercado de la caché.
+**Dos estudios al día** (`panel.horas_estudio`, por defecto 08:00 y 16:00 hora de la empresa): cada turno hace un
+estudio nuevo, siempre con consultas nuevas a las webs de mercado, a su hora o con el primer `/panel` del turno, y se
+reutiliza hasta el siguiente, también tras reiniciar el servicio (`panel.json`). Antes de las 08:00 vale el de las 16:00
+del día anterior. `POST /api/panel/actualizar` lo rehace a mano con datos frescos del negocio y el mercado de la caché.
 
 **Avisos** — resumen diario a la hora del perfil (panel recién generado + 4 propuestas principales, sin modelo) y
 revisión de alertas urgentes del negocio cada N minutos con plantilla fija, anti-repetición de 24 h, máximo diario y

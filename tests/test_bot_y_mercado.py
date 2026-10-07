@@ -18,7 +18,7 @@ def test_bot_construye_y_programa(tmp_path):
     bot = BotTelegram(s, "123456:ABCDEF", (42,))
     assert bot.url_panel() == "https://p.ejemplo/panel?t=tk"
     bot.programar()
-    assert {"resumen", "alertas", "estudio"} <= {j.name for j in bot.app.job_queue.jobs()}
+    assert {"resumen", "alertas", "estudio 08:00", "estudio 16:00", "estudio_inicio"} <= {j.name for j in bot.app.job_queue.jobs()}
 
 
 async def test_bot_rechaza_desconocidos_y_grupos(servicio):
@@ -94,8 +94,9 @@ async def test_sin_claude_no_se_crea_el_orquestador_y_el_bot_lo_dice(tmp_path):
     assert "desactivadas" in enviados[0] and "/panel" in enviados[0]
 
 
-async def test_un_estudio_por_dia(tmp_path):
-    """El panel se hace una vez al día (con mercado fresco) y se reutiliza, también tras reiniciar el servicio."""
+async def test_un_estudio_por_turno(tmp_path):
+    """Dos estudios al día (08:00 y 16:00, hora de Cuba), cada uno con mercado fresco; entre turnos se reutiliza,
+    también tras reiniciar el servicio."""
     from datetime import datetime
 
     from agente_central.tiempo import Reloj
@@ -103,9 +104,9 @@ async def test_un_estudio_por_dia(tmp_path):
     cfg = cargar(tmp_path / "datos")
     zona = cfg.empresa["zona_horaria"]
 
-    def servicio_el(dia: str) -> tuple[Servicio, list]:
+    def servicio_el(momento: str) -> tuple[Servicio, list]:
         s = crear_servicio(cfg, tmp_path)
-        s.reloj_estudio = s.constructor.reloj_estudio = Reloj(zona, datetime.fromisoformat(dia))
+        s.reloj_estudio = s.constructor.reloj_estudio = Reloj(zona, datetime.fromisoformat(momento))
         llamadas = []
         construir = s.constructor.construir
 
@@ -116,20 +117,27 @@ async def test_un_estudio_por_dia(tmp_path):
         return s, llamadas
 
     s, llamadas = servicio_el("2026-10-07T09:00:00-04:00")
-    assert not s.panel_de_hoy()
+    assert s.turno_actual().isoformat(timespec="minutes") == "2026-10-07T08:00-04:00" and not s.panel_vigente()
     p = await s.panel()
-    assert llamadas == [{"forzar_mercado": True}]
-    assert p["meta"]["estudio"] == "2026-10-07" and p["meta"]["generado"].startswith("2026-10-07T09:00")
-    assert p["meta"]["periodo"]["hasta"] == "2026-09-30"           # el negocio de prueba sigue en su fecha
-    assert await s.panel() is p and await s.panel_html() and len(llamadas) == 1 and s.panel_de_hoy()
+    assert llamadas == [{"forzar_mercado": True}] and p["meta"]["turno"] == "2026-10-07T08:00-04:00"
+    assert p["meta"]["estudio"] == "2026-10-07" and p["meta"]["periodo"]["hasta"] == "2026-09-30"   # negocio de prueba
+    assert await s.panel() is p and await s.panel_html() and len(llamadas) == 1 and s.panel_vigente()
 
-    s2, llamadas2 = servicio_el("2026-10-07T18:00:00-04:00")       # reinicio el mismo día: se reutiliza
-    assert s2.panel_de_hoy() and (await s2.panel())["meta"]["generado"] == p["meta"]["generado"] and not llamadas2
+    s2, llamadas2 = servicio_el("2026-10-07T15:59:00-04:00")       # reinicio en el mismo turno: se reutiliza
+    assert s2.panel_vigente() and (await s2.panel())["meta"]["generado"] == p["meta"]["generado"] and not llamadas2
 
-    s3, llamadas3 = servicio_el("2026-10-08T07:30:00-04:00")       # día nuevo: estudio nuevo
-    assert (await s3.panel())["meta"]["estudio"] == "2026-10-08" and llamadas3 == [{"forzar_mercado": True}]
-    await s3.panel(forzar=True)                                    # actualizar a mano: mercado de la caché
-    assert llamadas3[-1] == {"forzar_mercado": False}
+    s3, llamadas3 = servicio_el("2026-10-07T16:30:00-04:00")       # turno de la tarde: estudio nuevo
+    p3 = await s3.panel()
+    assert llamadas3 == [{"forzar_mercado": True}] and p3["meta"]["turno"] == "2026-10-07T16:00-04:00"
+
+    s4, llamadas4 = servicio_el("2026-10-08T06:30:00-04:00")       # antes de las 08:00 vale el de ayer a las 16:00
+    assert s4.turno_actual().isoformat(timespec="minutes") == "2026-10-07T16:00-04:00"
+    assert (await s4.panel())["meta"]["turno"] == "2026-10-07T16:00-04:00" and not llamadas4
+
+    s5, llamadas5 = servicio_el("2026-10-08T08:00:00-04:00")
+    assert (await s5.panel())["meta"]["turno"] == "2026-10-08T08:00-04:00" and llamadas5 == [{"forzar_mercado": True}]
+    await s5.panel(forzar=True)                                    # actualizar a mano: mercado de la caché
+    assert llamadas5[-1] == {"forzar_mercado": False}
 
 
 async def test_panel_de_formato_anterior_se_rehace_con_el_mercado_de_la_cache(tmp_path):
@@ -142,7 +150,8 @@ async def test_panel_de_formato_anterior_se_rehace_con_el_mercado_de_la_cache(tm
     cfg = cargar(tmp_path / "datos")
     s = crear_servicio(cfg, tmp_path)
     s.reloj_estudio = s.constructor.reloj_estudio = Reloj(cfg.empresa["zona_horaria"], datetime.fromisoformat("2026-10-07T16:30:00-04:00"))
-    viejo = {"meta": {"estudio": "2026-10-07", "generado": "2026-10-07T09:00", "periodo": {"hasta": "2026-09-30"}}, "propuestas": []}
+    viejo = {"meta": {"estudio": "2026-10-07", "turno": "2026-10-07T16:00-04:00", "generado": "2026-10-07T16:05",
+                      "periodo": {"hasta": "2026-09-30"}}, "propuestas": []}
     (cfg.directorio_datos).mkdir(parents=True, exist_ok=True)
     (cfg.directorio_datos / "panel.json").write_text(_json.dumps(viejo))
     s._panel = s._cargar()
@@ -153,10 +162,10 @@ async def test_panel_de_formato_anterior_se_rehace_con_el_mercado_de_la_cache(tm
         llamadas.append(kw)
         return await construir(**kw)
     s.constructor.construir = contar
-    assert not s.panel_de_hoy()
+    assert not s.panel_vigente()
     p = await s.panel()
     assert llamadas == [{"forzar_mercado": False}] and p["meta"]["formato"] >= 2 and p["meta"]["tasa_dia"]["usd_cup"]
-    assert s.panel_de_hoy() and await s.panel() is p and len(llamadas) == 1
+    assert s.panel_vigente() and await s.panel() is p and len(llamadas) == 1
 
 
 async def test_negocio_en_cup_y_menu_de_comandos(servicio, monkeypatch):
@@ -224,3 +233,19 @@ async def test_si_algo_falla_el_bot_contesta(servicio, monkeypatch):
     await bot._error(NS(effective_chat=NS(id=99)), NS(error=RuntimeError("caída")))      # desconocido: no se le contesta
     assert enviados == [(42, "⚠️ No pude completar la petición (RuntimeError). Ha quedado registrado; "
                              "inténtalo de nuevo en unos minutos.")]
+
+
+async def test_estudio_con_tiempo_maximo_y_bot_en_paralelo(tmp_path):
+    import asyncio
+
+    cfg = cargar(tmp_path / "datos")
+    cfg.datos["panel"]["max_minutos_estudio"] = 0.002            # ~0,1 s
+    s = crear_servicio(cfg, tmp_path)
+
+    async def colgado(**kw):
+        await asyncio.sleep(5)
+    s.constructor.construir = colgado
+    with pytest.raises(TimeoutError, match="no terminó"):
+        await s.panel()
+    assert not s._panel_lock.locked()                              # el siguiente intento no queda bloqueado
+    assert BotTelegram(s, "123456:ABCDEF", (42,)).app.concurrent_updates > 1

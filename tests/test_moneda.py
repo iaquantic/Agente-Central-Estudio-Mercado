@@ -47,8 +47,25 @@ async def test_sin_eltoque_se_usa_la_del_agente_interno(tmp_path):
     pedidas = []
     t = TasaDia(Reloj("America/Havana", AHORA), tmp_path / "t.json", "clave", _cliente([httpx.Response(503)], pedidas))
     r = await t.obtener({"date": "2026-09-30", "usd_cup": 741.74, "source": "elTOQUE"})
-    assert r["usd_cup"] == 741.74 and "Agente Interno" in r["fuente"] and r["aviso"] is None
+    assert r["usd_cup"] == 741.74 and "Agente Interno" in r["fuente"] and "elTOQUE no responde" in r["aviso"]
     await t.obtener({"date": "2026-09-30", "usd_cup": 741.74})       # no reintenta antes de una hora
     assert len(pedidas) == 1 and not (tmp_path / "t.json").exists()
     sin_clave = await TasaDia(Reloj("America/Havana", AHORA), tmp_path / "t.json", "").obtener({"date": "2026-09-30", "usd_cup": 741.74})
     assert "ELTOQUE_API_KEY" in sin_clave["aviso"]
+
+
+async def test_la_tasa_se_renueva_cada_hora(tmp_path):
+    from datetime import timedelta
+
+    pedidas = []
+    respuestas = [{"date": "2026-10-07", "hour": 9, "minutes": 5, "tasas": {"USD": 770.0}},
+                  {"date": "2026-10-07", "hour": 11, "minutes": 2, "tasas": {"USD": 775.0}}, httpx.Response(503)]
+    cli = _cliente(respuestas, pedidas)
+    t = TasaDia(Reloj("America/Havana", AHORA), tmp_path / "t.json", "clave", cli)
+    assert (await t.obtener())["usd_cup"] == 770.0
+    t.reloj = Reloj("America/Havana", AHORA + timedelta(minutes=30))
+    assert (await t.obtener())["usd_cup"] == 770.0 and len(pedidas) == 1          # aún vigente
+    t.reloj = Reloj("America/Havana", AHORA + timedelta(minutes=65))
+    assert (await t.obtener())["usd_cup"] == 775.0 and len(pedidas) == 2          # renovada
+    t.reloj = Reloj("America/Havana", AHORA + timedelta(minutes=130))
+    assert (await t.obtener())["usd_cup"] == 775.0 and len(pedidas) == 3          # elTOQUE falla: la última de hoy

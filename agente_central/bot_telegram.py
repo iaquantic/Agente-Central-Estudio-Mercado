@@ -13,12 +13,13 @@ import logging
 import time as _time
 from collections import defaultdict, deque
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputFile, Update
+from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, MenuButtonCommands, Update
 from telegram.constants import ChatAction, ChatType, ParseMode
-from telegram.error import BadRequest
+from telegram.error import BadRequest, TelegramError
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
 from .formato import html_telegram, propuestas_html, texto_plano, trocear
+from .interno import datos
 from .moneda import dinero_de_panel
 from .planificador import Avisador, _hora
 
@@ -50,6 +51,12 @@ SIN_CLAUDE = ("Ahora mismo las preguntas en texto libre están desactivadas. Pue
               "/panel · panel con gráficos\n/oportunidades · decisiones propuestas\n/negocio · cómo va el negocio hoy")
 
 BOTONES_INICIO = {"📈 Panel": "panel", "💡 Oportunidades": "oportunidades", "🏪 Mi negocio hoy": "negocio"}
+
+
+# Menú de comandos de Telegram (botón «Menú» junto al cuadro de texto).
+MENU = [("panel", "📈 Panel con gráficos (negocio + mercado)"), ("oportunidades", "💡 Decisiones propuestas"),
+        ("negocio", "🏪 Cómo va el negocio hoy"), ("mercado", "🔎 Un producto en el mercado: /mercado aceite"),
+        ("producto", "⚖️ Tu producto frente al mercado: /producto pollo"), ("ayuda", "❔ Qué puedo hacer")]
 
 
 def teclado(botones: dict[str, str] | None) -> InlineKeyboardMarkup | None:
@@ -153,6 +160,14 @@ class BotTelegram:
                                           respuesta=r.texto, estado=r.estado, herramientas=r.herramientas,
                                           latencia_ms=r.latencia_ms, tokens=r.tokens, error=r.error)
 
+    async def configurar_menu(self) -> None:
+        """Publica los comandos en el menú del bot. Si falla, el bot funciona igual (los comandos se pueden escribir)."""
+        try:
+            await self.app.bot.set_my_commands([BotCommand(c, d) for c, d in MENU])
+            await self.app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+        except TelegramError as e:
+            log.warning("No se pudo configurar el menú de comandos: %s", e)
+
     # Comandos -----------------------------------------------------------------------------------
     def _handlers(self) -> None:
         a = self.app
@@ -214,11 +229,24 @@ class BotTelegram:
         if r.get("status") == "error":
             await self._enviar(chat_id, "Ahora mismo no puedo consultar los datos del negocio. Inténtalo en unos minutos.")
             return
-        lineas = [f"🏪 <b>{html.escape(self.s.cfg.nombre)} hoy</b>", html.escape(r.get("summary") or "")]
+        lineas = [f"🏪 <b>{html.escape(self.s.cfg.nombre)} hoy</b>", html.escape(await self._linea_negocio() or r.get("summary") or "")]
         urg = [a for a in r.get("alerts", []) if a.get("priority") == "urgent"][:4]
         if urg:
             lineas.append("\n<b>Urgente</b>\n" + "\n".join(f"• {html.escape(a['title'])}" for a in urg))
         await self._enviar(chat_id, "\n".join(lineas))
+
+    async def _linea_negocio(self) -> str | None:
+        """Ventas de hoy y del mes con los importes en la moneda principal (el resumen del Agente Interno va en USD)."""
+        bs = datos(await self.s.interno.herramienta("get_business_summary", {"date": self.s.reloj.hoy().isoformat()}))
+        if not bs or not bs.get("today"):
+            return None
+        din, t, mes = await self.s.dinero(), bs["today"], bs.get("month_to_date") or {}
+        v = bs.get("vs_expected_pct")
+        texto = (f"Hoy hasta las {bs.get('as_of_hour') or '—'}: {din(t.get('net_usd'))} en {t.get('tickets', 0)} ventas"
+                 + (f" ({v:+.1f} % frente a lo esperado)".replace(".", ",") if v is not None else "") + ".")
+        if mes.get("net_usd") is not None:
+            texto += f" Mes: {din(mes['net_usd'], 0)}."
+        return texto
 
     async def cmd_negocio(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if await self._autorizado(update):

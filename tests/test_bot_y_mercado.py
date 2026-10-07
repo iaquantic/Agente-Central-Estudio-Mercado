@@ -130,3 +130,57 @@ async def test_un_estudio_por_dia(tmp_path):
     assert (await s3.panel())["meta"]["estudio"] == "2026-10-08" and llamadas3 == [{"forzar_mercado": True}]
     await s3.panel(forzar=True)                                    # actualizar a mano: mercado de la caché
     assert llamadas3[-1] == {"forzar_mercado": False}
+
+
+async def test_panel_de_formato_anterior_se_rehace_con_el_mercado_de_la_cache(tmp_path):
+    """Tras desplegar un cambio de presentación, el panel del día guardado con el formato viejo no se reutiliza."""
+    import json as _json
+    from datetime import datetime
+
+    from agente_central.tiempo import Reloj
+
+    cfg = cargar(tmp_path / "datos")
+    s = crear_servicio(cfg, tmp_path)
+    s.reloj_estudio = s.constructor.reloj_estudio = Reloj(cfg.empresa["zona_horaria"], datetime.fromisoformat("2026-10-07T16:30:00-04:00"))
+    viejo = {"meta": {"estudio": "2026-10-07", "generado": "2026-10-07T09:00", "periodo": {"hasta": "2026-09-30"}}, "propuestas": []}
+    (cfg.directorio_datos).mkdir(parents=True, exist_ok=True)
+    (cfg.directorio_datos / "panel.json").write_text(_json.dumps(viejo))
+    s._panel = s._cargar()
+    llamadas = []
+    construir = s.constructor.construir
+
+    async def contar(**kw):
+        llamadas.append(kw)
+        return await construir(**kw)
+    s.constructor.construir = contar
+    assert not s.panel_de_hoy()
+    p = await s.panel()
+    assert llamadas == [{"forzar_mercado": False}] and p["meta"]["formato"] >= 2 and p["meta"]["tasa_dia"]["usd_cup"]
+    assert s.panel_de_hoy() and await s.panel() is p and len(llamadas) == 1
+
+
+async def test_negocio_en_cup_y_menu_de_comandos(servicio, monkeypatch):
+    from telegram.ext import ExtBot
+
+    from agente_central.bot_telegram import MENU
+
+    bot = BotTelegram(servicio, "123456:ABCDEF", (42,))
+    linea = (await bot._linea_negocio()).replace(" ", " ").replace(" ", " ")
+    assert linea.startswith("Hoy hasta las 11:30: ") and " CUP (" in linea and "USD) en " in linea and "Mes: " in linea
+
+    publicados = {}
+
+    async def set_my_commands(self, comandos, **kw):
+        publicados["comandos"] = [(c.command, c.description) for c in comandos]
+        return True
+
+    async def set_chat_menu_button(self, **kw):
+        publicados["boton"] = kw["menu_button"].type
+        return True
+    monkeypatch.setattr(ExtBot, "set_my_commands", set_my_commands)
+    monkeypatch.setattr(ExtBot, "set_chat_menu_button", set_chat_menu_button)
+    await bot.configurar_menu()
+    assert [c for c, _ in publicados["comandos"]] == ["panel", "oportunidades", "negocio", "mercado", "producto", "ayuda"]
+    assert publicados["boton"] == "commands"
+    registrados = {c for h in bot.app.handlers[0] for c in getattr(h, "commands", ())}
+    assert all(c in registrados and len(d) <= 256 for c, d in MENU)

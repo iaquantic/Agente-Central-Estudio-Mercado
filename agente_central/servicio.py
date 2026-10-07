@@ -11,7 +11,8 @@ from .config import Config
 from .externo import ClienteMercado
 from .interno import crear_cliente_interno, datos, tasa
 from .moneda import TasaDia, fx_de
-from .panel import ConstructorPanel, periodos
+from .moneda import formateador
+from .panel import FORMATO_PANEL, ConstructorPanel, periodos
 from .panel_html import renderizar
 from .registro import Registro
 from .tiempo import Reloj
@@ -67,7 +68,13 @@ class Servicio:
 
     def panel_de_hoy(self) -> bool:
         """¿Ya está hecho el estudio de hoy? (para avisar al dueño de que el primero del día tarda unos minutos)."""
-        return bool(self._panel) and self._panel["meta"].get("estudio") == self.reloj_estudio.hoy().isoformat()
+        return (bool(self._panel) and self._panel["meta"].get("estudio") == self.reloj_estudio.hoy().isoformat()
+                and self._panel["meta"].get("formato") == FORMATO_PANEL)
+
+    async def dinero(self):
+        """Formato de importes con la tasa de hoy: «2 926 CUP (3,80 USD)» (o al revés si la moneda principal es USD)."""
+        fx, _ = await self.tasa()
+        return formateador((fx or {}).get("usd_cup"), self.cfg["panel"]["moneda_principal"])
 
     async def panel(self, *, forzar: bool = False, forzar_mercado: bool = False) -> dict:
         """El estudio del día: se hace una sola vez al día (el primero que se pida o a `panel.hora_estudio`) y después
@@ -76,8 +83,8 @@ class Servicio:
         Un estudio nuevo consulta siempre las webs de mercado. `forzar` rehace el panel en el mismo día con datos
         frescos del negocio (los análisis de mercado salen de su caché); `forzar_mercado` también rehace el mercado."""
         async with self._panel_lock:
-            nuevo_dia = not self.panel_de_hoy()
-            if forzar or forzar_mercado or nuevo_dia:
+            nuevo_dia = not (self._panel and self._panel["meta"].get("estudio") == self.reloj_estudio.hoy().isoformat())
+            if forzar or forzar_mercado or not self.panel_de_hoy():     # día nuevo o panel de un formato anterior
                 inicio = time.monotonic()
                 self._panel = await self.constructor.construir(forzar_mercado=forzar_mercado or nuevo_dia)
                 self._guardar(self._panel)

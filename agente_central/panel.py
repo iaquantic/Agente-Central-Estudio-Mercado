@@ -27,6 +27,10 @@ def _meses_atras(d: date, n: int) -> date:
     return date(y, m, 1)
 
 
+# Versión del formato del panel: un panel guardado con otra versión se rehace aunque sea del mismo día
+# (p. ej. tras desplegar un cambio de presentación como los importes en CUP).
+FORMATO_PANEL = 2
+
 def periodos(hoy: date, meses_historial: int = 12) -> dict[str, date]:
     lunes = hoy - timedelta(days=hoy.weekday())
     return {"mes_desde": hoy.replace(day=1), "hasta": hoy,
@@ -119,6 +123,7 @@ class ConstructorPanel:
                 "titulo": cfg["panel"]["titulo"], "proveedor": cfg["marca"]["proveedor"],
                 "generado": self.reloj_estudio.ahora().isoformat(timespec="minutes"),
                 "estudio": self.reloj_estudio.hoy().isoformat(),
+                "formato": FORMATO_PANEL,
                 "tasa_dia": tasa_dia or (fx and {"usd_cup": fx.get("usd_cup"), "fecha": str(fx.get("date") or "")[:10],
                                                  "fuente": fx.get("source")}),
                 "moneda_principal": cfg["panel"]["moneda_principal"],

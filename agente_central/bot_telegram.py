@@ -177,6 +177,19 @@ class BotTelegram:
             a.add_handler(CommandHandler(nombre, f))
         a.add_handler(CallbackQueryHandler(self.boton))
         a.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.texto))
+        a.add_error_handler(self._error)
+
+    async def _error(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Cualquier fallo de un comando: queda en el registro con su traza y el dueño recibe una respuesta."""
+        log.error("Fallo atendiendo un mensaje de Telegram", exc_info=context.error)
+        chat = getattr(update, "effective_chat", None)
+        if chat is None or chat.id not in self.usuarios:
+            return
+        try:
+            await self.app.bot.send_message(chat.id, f"⚠️ No pude completar la petición ({type(context.error).__name__}). "
+                                                     "Ha quedado registrado; inténtalo de nuevo en unos minutos.")
+        except TelegramError:
+            log.warning("Tampoco se pudo avisar del fallo por Telegram")
 
     async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if await self._autorizado(update):

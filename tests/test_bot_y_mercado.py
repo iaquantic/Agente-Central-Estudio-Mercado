@@ -208,3 +208,19 @@ async def test_el_analisis_incluye_los_anuncios_recien_capturados(tmp_path):
     a = await mercado.analizar({"name": "aceite de girasol", "quantity": 1, "unit": "L"})
     precios = a["price_statistics"]["by_currency"]["USD"]["presentation_price"]
     assert precios["n"] == 8 and 4.3 <= precios["price_median"] <= 4.4
+
+
+async def test_si_algo_falla_el_bot_contesta(servicio, monkeypatch):
+    from telegram.ext import ExtBot
+
+    enviados = []
+
+    async def send_message(self, chat_id, text, **kw):
+        enviados.append((chat_id, text))
+    monkeypatch.setattr(ExtBot, "send_message", send_message)
+    bot = BotTelegram(servicio, "123456:ABCDEF", (42,))
+    assert bot._error in bot.app.error_handlers
+    await bot._error(NS(effective_chat=NS(id=42)), NS(error=RuntimeError("caída")))
+    await bot._error(NS(effective_chat=NS(id=99)), NS(error=RuntimeError("caída")))      # desconocido: no se le contesta
+    assert enviados == [(42, "⚠️ No pude completar la petición (RuntimeError). Ha quedado registrado; "
+                             "inténtalo de nuevo en unos minutos.")]

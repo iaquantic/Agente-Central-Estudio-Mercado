@@ -87,8 +87,12 @@ class Servicio:
             nuevo_dia = not (self._panel and self._panel["meta"].get("estudio") == self.reloj_estudio.hoy().isoformat())
             if forzar or forzar_mercado or not self.panel_de_hoy():     # día nuevo o panel de un formato anterior
                 inicio = time.monotonic()
+                log.info("Estudio del día: empieza (mercado %s)", "con consultas nuevas a las webs" if forzar_mercado or nuevo_dia
+                         else "de la caché del día")
                 self._panel = await self.constructor.construir(forzar_mercado=forzar_mercado or nuevo_dia)
                 self._guardar(self._panel)
+                log.info("Estudio del día: listo en %d s (%d productos, %d propuestas)", time.monotonic() - inicio,
+                         len(self._panel["productos"]), len(self._panel["propuestas"]))
                 await self.registro.evento("panel", {"ms": int((time.monotonic() - inicio) * 1000),
                                                      "propuestas": len(self._panel["propuestas"]),
                                                      "avisos": self._panel["calidad"]["avisos"]})

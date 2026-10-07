@@ -85,6 +85,16 @@ async def cmd_preguntar(args) -> int:
     return 0 if r.estado == "ok" else 2
 
 
+def _error_polling(e: Exception) -> None:
+    from telegram.error import Conflict
+
+    if isinstance(e, Conflict):     # dos procesos con el mismo token: normal unos segundos durante un despliegue
+        logging.warning("Telegram: otro proceso está usando el mismo token del bot (si dura más de un minuto, "
+                        "hay dos bots en marcha: detén uno)")
+    else:
+        logging.error("Telegram: error al recibir mensajes: %s", e)
+
+
 async def cmd_servir(args) -> int:
     import uvicorn
 
@@ -102,8 +112,9 @@ async def cmd_servir(args) -> int:
         bot = BotTelegram(s, cfg.telegram_token, cfg.telegram_usuarios)
         bot.programar()
         await bot.app.initialize()
+        await bot.configurar_menu()
         await bot.app.start()
-        await bot.app.updater.start_polling(drop_pending_updates=True)
+        await bot.app.updater.start_polling(drop_pending_updates=True, error_callback=_error_polling)
         logging.info("Bot de Telegram en marcha (%d usuarios autorizados)", len(cfg.telegram_usuarios))
     else:
         logging.warning("Sin TELEGRAM_BOT_TOKEN (o TELEGRAM_BOT_API): solo se sirve el panel web")

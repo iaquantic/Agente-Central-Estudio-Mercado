@@ -185,6 +185,8 @@ details[open] summary { margin-bottom: 8px; }
 .refs td.titulo { max-width: 380px; }
 .refs tr.no-usado td { color: var(--muted); }
 .uso { font-size: 12px; white-space: nowrap; }
+.refs h3.seg { font: 600 14px/1.3 var(--font-titulos); margin: 14px 0 2px; }
+.refs h3.seg .chip { font-size: 11px; margin-left: 6px; vertical-align: 1px; }
 
 /* Inventario y alertas */
 .estados { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
@@ -236,7 +238,7 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
 
   <section class="tarjeta" aria-labelledby="t-posicion">
     <header><div><div class="eyebrow">Precio</div><h2 id="t-posicion">Tu precio frente al mercado</h2></div>
-      <div class="leyenda"><span><i class="k-punto"></i>Tu precio</span><span><i class="k-mediana"></i>Mediana del mercado</span><span><i class="k-banda"></i>Mitad central de los anuncios (p25–p75)</span></div></header>
+      <div class="leyenda"><span><i class="k-punto"></i>Tu precio</span><span><i class="k-mediana"></i>Mediana del mercado de referencia</span><span><i class="k-banda"></i>Mitad central de los anuncios (p25–p75)</span></div></header>
     <div class="posicion" id="posicion"></div>
     <details><summary>Ver como tabla</summary><div class="tabla-scroll" id="tabla-posicion"></div></details>
   </section>
@@ -312,6 +314,10 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
   // Tarjetas de indicadores: millones abreviados en la moneda principal (77,5 M CUP) para que quepan.
   const kpiUsd = (v, d = 0) => v == null || !EN_CUP || Math.abs(v * TASA) < 1e6 ? usd(v, d)
     : `${nf1.format(v * TASA / 1e6)} M CUP <span class=eq>(${soloUsd(v, d)})</span>`;
+  const SEG_NOMBRES = {};
+  (D.productos || []).forEach((p) => Object.values((p.mercado || {}).segmentos || {}).forEach((g) => { SEG_NOMBRES[g.clave] = g.nombre; }));
+  const SEG_CLAVES = Object.keys(SEG_NOMBRES);
+  const cap = (t) => t ? t.charAt(0).toUpperCase() + t.slice(1) : "";
   const eje = (v) => EN_CUP ? nf0.format(v) : nf2.format(v);
   const compacto = (v) => v == null ? "—" : Math.abs(v) >= 1e6 ? nf1.format(v / 1e6) + " M" : Math.abs(v) >= 1e4 ? nf1.format(v / 1e3) + " k" : nf0.format(v);
   const pct = (v, signo = true) => v == null ? "—" : (signo && v > 0 ? "+" : "") + nf1.format(v) + " %";
@@ -361,6 +367,7 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
     M.estudio ? `<span class="pastilla">Estudio de mercado del ${fecha(M.estudio)}</span>` : "",
     TASA ? `<span class="pastilla">1 USD = ${nf2.format(TASA)} CUP · ${esc(TASA_DIA.fuente || "")}${TASA_DIA.fecha ? " · " + fecha(TASA_DIA.fecha) : ""}</span>`
          : fx ? `<span class="pastilla">1 USD = ${nf2.format(fx.usd_cup)} CUP · ${esc(fx.source)}</span>` : "",
+    M.referencia_mercado ? `<span class="pastilla">Referencia: ${esc(M.referencia_mercado)}</span>` : "",
     `<span class="pastilla">Actualizado ${fechaHora(M.generado)}</span>`
   ].join("");
   $("subtitulo").textContent = M.empresa.descripcion || "";
@@ -410,8 +417,8 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
     ps.forEach((p) => {
       const m = p.mercado, d = p.posicion.diferencia_pct;
       const p25 = rel(m.p25_usd, m.referencia_usd), p75 = rel(m.p75_usd, m.referencia_usd);
-      const t = `<b>${esc(p.nombre)}</b><br>Tu precio: ${usd(p.interno.precio_usd, 2)}<br>Mediana del mercado: ${usd(m.referencia_usd, 2)}<br>p25–p75: ${usd(m.p25_usd, 2)} – ${usd(m.p75_usd, 2)}<br>${m.n} anuncios · confianza ${esc(m.confianza)}`;
-      html += `<div class="nombre">${esc(p.nombre)}<small>${usd(p.interno.precio_usd, 2)} · mercado ${usd(m.referencia_usd, 2)}</small></div>
+      const t = `<b>${esc(p.nombre)}</b><br>Tu precio: ${usd(p.interno.precio_usd, 2)}<br>Mediana (${esc(m.nombre_referencia || "mercado")}): ${usd(m.referencia_usd, 2)}<br>p25–p75: ${usd(m.p25_usd, 2)} – ${usd(m.p75_usd, 2)}<br>${m.n} anuncios · confianza ${esc(m.confianza)}`;
+      html += `<div class="nombre">${esc(p.nombre)}<small>${usd(p.interno.precio_usd, 2)} · ${esc(m.nombre_referencia || "mercado")} ${usd(m.referencia_usd, 2)}</small></div>
         <div class="pista" tabindex="0" data-tip="${esc(t)}" aria-label="${esc(p.nombre)}: tu precio ${pct(d)} frente a la mediana">
           <div class="cero" style="left:${x(0)}"></div>
           ${p25 != null && p75 != null ? `<div class="rango" style="left:${x(p25)};width:calc(${x(p75)} - ${x(p25)})"></div>` : ""}
@@ -421,29 +428,43 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
         <div class="dif">${pct(d)}</div>`;
     });
     $("posicion").innerHTML = html;
-    $("tabla-posicion").innerHTML = `<table><thead><tr><th>Producto</th><th class="num">Tu precio</th><th class="num">Mediana mercado</th><th class="num">p25</th><th class="num">p75</th><th class="num">Diferencia</th><th class="num">Anuncios</th><th>Confianza</th></tr></thead><tbody>${
-      ps.map((p) => `<tr><td>${esc(p.nombre)}</td><td class="num">${usd(p.interno.precio_usd, 2)}</td><td class="num">${usd(p.mercado.referencia_usd, 2)}</td><td class="num">${usd(p.mercado.p25_usd, 2)}</td><td class="num">${usd(p.mercado.p75_usd, 2)}</td><td class="num">${pct(p.posicion.diferencia_pct)}</td><td class="num">${p.mercado.n}</td><td>${esc(p.mercado.confianza)}</td></tr>`).join("")}</tbody></table>`;
+    const celda = (g, ref) => g && g.referencia_usd ? `${usd(g.referencia_usd, 2)} <span class="eq">· ${g.n} an.${ref ? " ✓" : ""}</span>` : "—";
+    $("tabla-posicion").innerHTML = SEG_CLAVES.length
+      ? `<table><thead><tr><th>Producto</th><th class="num">Tu precio</th>${SEG_CLAVES.map((k) => `<th class="num">${esc(cap(SEG_NOMBRES[k]))}</th>`).join("")}<th class="num">Diferencia</th><th>Confianza</th></tr></thead><tbody>${
+          ps.map((p) => `<tr><td>${esc(p.nombre)}</td><td class="num">${usd(p.interno.precio_usd, 2)}</td>${SEG_CLAVES.map((k) => `<td class="num">${celda((p.mercado.segmentos || {})[k], p.mercado.segmento === k)}</td>`).join("")}<td class="num">${pct(p.posicion.diferencia_pct)}</td><td>${esc(p.mercado.confianza)}</td></tr>`).join("")}</tbody></table><p class="nota">✓ referencia de las propuestas; la diferencia es frente a ella.</p>`
+      : `<table><thead><tr><th>Producto</th><th class="num">Tu precio</th><th class="num">Mediana mercado</th><th class="num">p25</th><th class="num">p75</th><th class="num">Diferencia</th><th class="num">Anuncios</th><th>Confianza</th></tr></thead><tbody>${
+          ps.map((p) => `<tr><td>${esc(p.nombre)}</td><td class="num">${usd(p.interno.precio_usd, 2)}</td><td class="num">${usd(p.mercado.referencia_usd, 2)}</td><td class="num">${usd(p.mercado.p25_usd, 2)}</td><td class="num">${usd(p.mercado.p75_usd, 2)}</td><td class="num">${pct(p.posicion.diferencia_pct)}</td><td class="num">${p.mercado.n}</td><td>${esc(p.mercado.confianza)}</td></tr>`).join("")}</tbody></table>`;
   })();
 
   // Anuncios de referencia ---------------------------------------------------------------------
   (function anuncios() {
-    const ps = (D.productos || []).filter((p) => p.mercado && (p.mercado.anuncios || []).length);
+    const SEGS = (p) => Object.values(p.mercado.segmentos || {});
+    const ps = (D.productos || []).filter((p) => p.mercado && ((p.mercado.anuncios_ref || []).length || SEGS(p).some((g) => (g.anuncios_ref || []).length)));
     if (!ps.length) { $("anuncios").innerHTML = '<p class="nota">Sin anuncios en este estudio.</p>'; return; }
-    const publicado = (a) => a.precio == null ? "—" : a.moneda === "CUP" ? nf0.format(a.precio) + " CUP" : nf2.format(a.precio) + " " + esc(a.moneda || "");
+    const publicado = (a) => a.precio == null ? "—" : a.moneda === "CUP" ? nf0.format(a.precio) + " CUP" + (a.moneda_corregida ? ' <span class=eq>(publicado «en USD»: moneda corregida)</span>' : "") : nf2.format(a.precio) + " " + esc(a.moneda || "");
     const enlace = (a) => /^https?:\/\//.test(a.url || "") ? `<a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.titulo || "anuncio")}</a>` : esc(a.titulo || "");
-    const uso = (a) => a.usado ? (a.atipico ? `En la referencia · precio ${a.atipico === "ALTO" ? "alto" : "bajo"}` : "✓ En la referencia")
+    const uso = (a) => a.usado ? (a.atipico ? `En la mediana · precio ${a.atipico === "ALTO" ? "alto" : "bajo"}` : "✓ En la mediana")
       : a.atipico ? `Atípico ${a.atipico === "ALTO" ? "alto" : "bajo"}: excluido` : "Otra presentación";
-    $("anuncios").innerHTML = ps.map((p) => {
-      const m = p.mercado, lista = m.anuncios, usados = lista.filter((a) => a.usado).length, r = m.anuncios_resumen || {};
-      const monedas = [m.n_cup ? `en CUP, mediana ${nf0.format(m.mediana_cup)} CUP (${m.n_cup} anuncios)` : "",
-                       m.n_usd ? `en USD, mediana ${nf2.format(m.mediana_usd)} USD (${m.n_usd} anuncios)` : ""].filter(Boolean).join(" · ");
-      return `<details class="refs"><summary><b>${esc(p.nombre)}</b>: referencia ${usd(m.referencia_usd, 2)} · ${nf0.format(m.n || usados)} anuncios usados${lista.length < (r.validos || 0) ? ` (se listan ${lista.length})` : ""}
-        <span class="nota">${m.presentacion_objetivo ? "Para " + esc(m.presentacion_objetivo) + ". " : ""}${monedas ? "Mercado " + monedas + ". " : ""}${m.base ? "Cálculo: " + esc(m.base) + "." : ""}</span></summary>
-        <p class="nota">Los precios de otras presentaciones se llevan a la del negocio con el precio por unidad (un saco de 25 kg → su precio por 1 kg).
-        ${r.duplicados ? `Se descartaron ${nf0.format(r.duplicados)} repeticiones del mismo anuncio. ` : ""}${r.atipicos ? `${nf0.format(r.atipicos)} con precio atípico (se marcan abajo).` : ""}</p>
-        <div class="tabla-scroll"><table><thead><tr><th>Fuente</th><th>Anuncio</th><th class="num">Precio publicado</th><th>Presentación</th><th class="num">Equivale a${m.presentacion_objetivo ? " (" + esc(m.presentacion_objetivo) + ")" : ""}</th><th>Uso</th><th>Visto</th></tr></thead><tbody>${
+    const monedas = (m) => [m.n_cup ? `en CUP mediana ${nf0.format(m.mediana_cup)} CUP (${m.n_cup})` : "",
+                            m.n_usd ? `en USD mediana ${nf2.format(m.mediana_usd)} USD (${m.n_usd})` : ""].filter(Boolean).join(" · ");
+    const tabla = (m, pres) => {
+      const lista = m.anuncios_ref || [], r = m.anuncios_resumen || {};
+      if (!lista.length) return '<p class="nota">Sin anuncios de este producto en este mercado.</p>';
+      return `<p class="nota">${monedas(m) ? "Anuncios " + monedas(m) + ". " : ""}${m.base ? "Cálculo: " + esc(m.base) + ". " : ""}${r.duplicados ? `Se descartaron ${nf0.format(r.duplicados)} repeticiones del mismo anuncio. ` : ""}${lista.length < (r.validos || 0) ? `Se listan ${lista.length} de ${r.validos}.` : ""}</p>
+        <div class="tabla-scroll"><table><thead><tr><th>Fuente</th><th>Anuncio</th><th class="num">Precio publicado</th><th>Presentación</th><th class="num">Equivale a${pres ? " (" + esc(pres) + ")" : ""}</th><th>Uso</th><th>Visto</th></tr></thead><tbody>${
           lista.map((a) => `<tr class="${a.usado ? "" : "no-usado"}"><td>${esc(a.fuente)}</td><td class="titulo">${enlace(a)}</td><td class="num">${publicado(a)}</td><td>${esc(a.presentacion || "—")}</td><td class="num">${usd(a.equivalente_usd, 2)}</td><td class="uso">${uso(a)}</td><td>${a.capturado ? fecha(a.capturado) : "—"}</td></tr>`).join("")
-        }</tbody></table></div></details>`;
+        }</tbody></table></div>`;
+    };
+    $("anuncios").innerHTML = ps.map((p) => {
+      const m = p.mercado, segs = SEGS(p), pres = m.presentacion_objetivo;
+      const linea = segs.length
+        ? segs.map((g) => `${esc(cap(g.nombre))}: ${g.referencia_usd ? usd(g.referencia_usd, 2) + ` (${nf0.format(g.n)} anuncios)` : "sin anuncios"}${g.clave === m.segmento ? " ✓" : ""}`).join(" · ")
+        : `referencia ${usd(m.referencia_usd, 2)} · ${nf0.format(m.n || 0)} anuncios`;
+      const bloques = segs.length
+        ? segs.map((g) => `<h3 class="seg">${esc(cap(g.nombre))}${(g.fuentes || []).length ? ` <span class="nota">(${esc(g.fuentes.join(", "))})</span>` : ""}: ${g.referencia_usd ? usd(g.referencia_usd, 2) : "—"}${g.clave === m.segmento ? ' <span class="chip info">referencia de las propuestas</span>' : ""}</h3>${tabla(g, pres)}`).join("")
+        : tabla(m, pres);
+      return `<details class="refs"><summary><b>${esc(p.nombre)}</b>${pres ? " · " + esc(pres) : ""}<span class="nota">${linea}</span></summary>
+        <p class="nota">Cada mercado se calcula por separado. Los precios de otras presentaciones se llevan a la del negocio con el precio por unidad (un saco de 25 kg → su precio por 1 kg).</p>${bloques}</details>`;
     }).join("");
   })();
 

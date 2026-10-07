@@ -236,6 +236,7 @@ def _p(x: float | None, signo: bool = False) -> str:
 def reglas(interno: dict, mercado: dict, r: dict, dinero: Callable[..., str] = _usd) -> list[dict]:
     """`dinero(usd, d)` da formato a los importes de los textos (moneda principal y su equivalente)."""
     out: list[dict] = []
+    nom = mercado.get("nombre_referencia") or "mercado"     # «mercado de calle», «tiendas online»
     ref = mercado.get("referencia_usd")
     precio, coste = interno.get("precio_usd"), interno.get("coste_medio_usd")
     estado = interno.get("estado_stock")
@@ -258,7 +259,7 @@ def reglas(interno: dict, mercado: dict, r: dict, dinero: Callable[..., str] = _
     # no se propone nada sobre esa base.
     if dif is not None and abs(dif) > r.get("diferencia_maxima_fiable_pct", 50):
         return [_propuesta("revisar_busqueda", "info", "Comparación con el mercado poco fiable",
-                           f"Tu precio, {dinero(precio)}, y la referencia del mercado, {dinero(ref)}, difieren un {_p(abs(dif))}: "
+                           f"Tu precio, {dinero(precio)}, y la referencia del {nom}, {dinero(ref)}, difieren un {_p(abs(dif))}: "
                            f"seguramente la búsqueda mezcla otros productos o presentaciones ({mercado.get('n')} anuncios "
                            "comparables). Revisa la búsqueda de este producto en el perfil antes de decidir.",
                            evidencia=ev)]
@@ -292,10 +293,10 @@ def reglas(interno: dict, mercado: dict, r: dict, dinero: Callable[..., str] = _
         out.append(_propuesta(
             "subir_precio", "alta" if comprimido else "media",
             "Margen comprimido: el mercado ya subió" if comprimido and sube else "Hay margen para subir el precio",
-            f"Vendes a {dinero(precio)}, un {_p(abs(dif))} por debajo de la mediana del mercado, que está en {dinero(ref)}"
+            f"Vendes a {dinero(precio)}, un {_p(abs(dif))} por debajo de la mediana del {nom}, que está en {dinero(ref)}"
             + (f"; tu margen es del {_p(margen)}" if margen is not None else "")
             + (f" y el mercado ha subido un {_p(var)}" if sube else "")
-            + f". Un precio de {dinero(objetivo)} te mantendría por debajo del mercado.",
+            + f". Un precio de {dinero(objetivo)} te mantendría por debajo del {nom}.",
             impacto=extra, base_impacto=f"margen adicional en {h} días a {dinero(objetivo)} con las mismas ventas ({_num(vel, 1)} u/día)",
             evidencia={**ev, "precio_propuesto_usd": objetivo}))
     elif margen is not None and margen < r["margen_minimo_pct"] and dif is not None and dif > -r["diferencia_precio_pct"]:
@@ -311,7 +312,7 @@ def reglas(interno: dict, mercado: dict, r: dict, dinero: Callable[..., str] = _
         out.append(_propuesta(
             "bajar_precio", "alta" if no_rota else "media",
             "Precio por encima del mercado" + (" y el producto no rota" if no_rota else ""),
-            f"Vendes a {dinero(precio)}, un {_p(dif)} por encima de la mediana del mercado, que está en {dinero(ref)}."
+            f"Vendes a {dinero(precio)}, un {_p(dif)} por encima de la mediana del {nom}, que está en {dinero(ref)}."
             + (f" Tienes {interno.get('stock')} u paradas, que valen {dinero(interno.get('valor_stock_usd'), 0)} a coste."
                if no_rota else (f" Además, el mercado baja un {_p(abs(var))}." if baja else " Vigila si las ventas empiezan a caer.")),
             impacto=interno.get("valor_stock_usd") if no_rota else None,
@@ -339,7 +340,7 @@ def reglas(interno: dict, mercado: dict, r: dict, dinero: Callable[..., str] = _
 
     if not out:
         out.append(_propuesta("en_linea", "info", "Precio en línea con el mercado",
-                              f"Diferencia con la mediana del mercado: {_p(dif, True)}. "
+                              f"Diferencia con la mediana del {nom}: {_p(dif, True)}. "
                               "No hay acción recomendada.", evidencia=ev))
 
     # La confianza del mercado modula la prioridad: con evidencia débil, nunca prioridad alta.
@@ -351,21 +352,12 @@ def reglas(interno: dict, mercado: dict, r: dict, dinero: Callable[..., str] = _
     return out
 
 
-def cruzar(ficha: dict, semanas: list[dict], analisis: dict | None, *, fx: dict | None, serie_fx: list[dict] | None,
-           reglas_cfg: dict, hoy: date, dinero: Callable[..., str] = _usd) -> dict[str, Any]:
-    """Resultado completo del cruce para un producto."""
-    interno = metricas_internas(ficha, semanas, hoy)
-    base = {"sku": ficha.get("sku"), "nombre": ficha.get("name"), "categoria": ficha.get("category"), "interno": interno}
-    if not analisis:
-        return {**base, "estado": "sin_datos_mercado", "mercado": None, "posicion": None,
-                "propuestas": [_propuesta("sin_mercado", "info", "Sin análisis de mercado",
-                                          "No se pudo obtener el análisis del Controlador de Mercado.")]}
-    tasa_actual = (fx or {}).get("usd_cup")
-    tasas = SerieTasa(serie_fx, tasa_actual)
-    ref = referencia_mercado(analisis, tasa_actual)
+def _mercado(analisis: dict, tasa: float | None, tasas: SerieTasa) -> dict[str, Any]:
+    """Referencia, tendencia, oferta y anuncios de un análisis (todo el mercado o uno de sus segmentos)."""
+    ref = referencia_mercado(analisis, tasa)
     serie = serie_usd_equivalente(analisis, tasas)
     sup = analisis.get("supply_statistics") or {}
-    mercado = {
+    return {
         **ref,
         "variacion_usd_pct": variacion_serie(serie),
         "tendencia_controlador": tendencia_precio(analisis),
@@ -378,10 +370,48 @@ def cruzar(ficha: dict, semanas: list[dict], analisis: dict | None, *, fx: dict 
         "capturado": (analisis.get("analysis_period") or {}).get("captured_at_max"),
         "fuentes": [s.get("source_name") or s.get("source_id") for s in analisis.get("sources") or [] if s.get("status") == "ok"],
         "limitaciones": analisis.get("limitations") or [],
-        "anuncios": anuncios_referencia(analisis, ref, tasa_actual),
+        "anuncios_ref": anuncios_referencia(analisis, ref, tasa),
         "anuncios_resumen": analisis.get("anuncios_resumen"),
         "presentacion_objetivo": _presentacion_objetivo(analisis),
     }
+
+
+def cruzar(ficha: dict, semanas: list[dict], analisis: dict | None, *, fx: dict | None, serie_fx: list[dict] | None,
+           reglas_cfg: dict, hoy: date, dinero: Callable[..., str] = _usd, segmentos_cfg: dict | None = None,
+           referencia: str | None = None) -> dict[str, Any]:
+    """Resultado completo del cruce para un producto.
+
+    Con `segmentos_cfg` (p. ej. calle = Revolico, online = Cuballama) cada mercado tiene su propia referencia y las
+    propuestas se calculan contra `referencia`; si ese mercado no tiene anuncios del producto, contra el otro.
+    """
+    interno = metricas_internas(ficha, semanas, hoy)
+    base = {"sku": ficha.get("sku"), "nombre": ficha.get("name"), "categoria": ficha.get("category"), "interno": interno}
+    if not analisis:
+        return {**base, "estado": "sin_datos_mercado", "mercado": None, "posicion": None,
+                "propuestas": [_propuesta("sin_mercado", "info", "Sin análisis de mercado",
+                                          "No se pudo obtener el análisis del Controlador de Mercado.")]}
+    tasa_actual = (fx or {}).get("usd_cup")
+    tasas = SerieTasa(serie_fx, tasa_actual)
+    general = _mercado(analisis, tasa_actual, tasas)
+    segmentos = {}
+    for clave, seg in (segmentos_cfg or {}).items():
+        a = (analisis.get("segmentos") or {}).get(clave)
+        datos_seg = _mercado(a, tasa_actual, tasas) if a else {"referencia_usd": None, "n": 0, "anuncios_ref": []}
+        segmentos[clave] = {**datos_seg, "clave": clave, "nombre": seg.get("nombre") or clave}
+    con_datos = [k for k, v in segmentos.items() if v.get("referencia_usd")]
+    elegido = referencia if referencia in con_datos else (con_datos[0] if con_datos else None)
+    if elegido:
+        # Referencia, tendencia y anuncios del mercado elegido; oferta y fuentes, de todo el mercado.
+        mercado = {**segmentos[elegido], **{k: general[k] for k in ("anuncios", "vendedores", "nivel_oferta", "señales", "fuentes")},
+                   "anuncios_ref": [], "limitaciones": list(segmentos[elegido].get("limitaciones") or [])}
+        if referencia and elegido != referencia:
+            mercado["limitaciones"].insert(0, f"Sin anuncios suficientes en {segmentos[referencia]['nombre']}: "
+                                              f"la referencia es {segmentos[elegido]['nombre']}.")
+        mercado["nombre_referencia"] = segmentos[elegido]["nombre"]
+    else:
+        mercado = {**general, "nombre_referencia": "mercado"}
+    mercado.update({"segmento": elegido, "segmento_preferido": referencia, "segmentos": segmentos})
+    ref = mercado
     dif = _pct(ref.get("referencia_usd"), interno.get("precio_usd"))
     umbral = reglas_cfg["diferencia_precio_pct"]
     posicion = None if dif is None else {

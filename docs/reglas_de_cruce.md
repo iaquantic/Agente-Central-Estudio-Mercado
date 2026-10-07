@@ -14,6 +14,20 @@ Implementadas en `agente_central/cruce.py`. Todos los umbrales están en `reglas
 | Variación del mercado (USD) | Ídem + serie de tasas del Interno | Mediana semanal en USD equivalentes (CUP ÷ tasa de esa semana); media de las 2 primeras semanas frente a las 2 últimas |
 | Diferencia de precio | — | (precio propio − referencia) ÷ referencia |
 
+## Mercados por separado (calle y tiendas online)
+El mercado cubano tiene dos niveles de precio muy distintos: el de calle (Revolico, en CUP y en USD) y el de las tiendas
+online para comprar desde fuera (Cuballama…), que suele ser de 2 a 4 veces más caro. Mezclarlos daba referencias que no
+corresponden a ninguno. Por eso cada mercado (`mercado.segmentos`, por fuente) se analiza por separado, con su propia
+mediana, sus atípicos y sus anuncios, y las propuestas se calculan contra `mercado.referencia` (por defecto, calle). Si
+ese mercado no tiene anuncios de un producto, se usa el otro y se indica en las limitaciones.
+
+Antes de calcular se corrigen los anuncios con la moneda mal puesta: un precio «en USD» más de 20 veces superior a la
+mediana del producto en CUP (pasada a USD) y que, leído como CUP, encaja con ella, se cuenta como CUP (p. ej. café de
+250 g a 1 400 «USD» en Revolico). En el panel se marcan como «moneda corregida».
+
+Cada referencia se puede comprobar en la sección «Anuncios de referencia» del panel: los anuncios usados, con enlace al
+original, su precio publicado, su presentación y su equivalente para la presentación del negocio.
+
 ## Reglas
 
 `d` = diferencia de precio, `v` = variación del mercado, umbrales por defecto entre paréntesis.

@@ -63,6 +63,12 @@ EMPRESA_CONFIG=config/empresa.yaml python -m agente_central comprobar
 
 Muestra cada SKU con su nombre en el negocio (✗ si no existe) y las fuentes de mercado configuradas.
 
+### Mercado de referencia
+`mercado.segmentos` agrupa las fuentes en mercados que se comparan por separado (por defecto, `calle`: Revolico y
+`online`: Cuballama, Cubamax, Cubatel). `mercado.referencia` elige contra cuál se calculan las propuestas: `calle` si el
+negocio vende a clientes locales, `online` si compite con las tiendas para enviar desde fuera. El panel muestra siempre
+los dos.
+
 ### Moneda de los importes
 `panel.moneda_principal: CUP` (por defecto) muestra los importes en CUP, convertidos con la tasa informal de elTOQUE
 del día (`ELTOQUE_API_KEY`), y al lado su valor en USD: «2 926 CUP (3,80 USD)». Con `USD`, al revés. Los subagentes

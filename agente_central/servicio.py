@@ -12,7 +12,7 @@ from .externo import ClienteMercado
 from .interno import crear_cliente_interno, datos, tasa
 from .moneda import TasaDia, fx_de
 from .moneda import formateador
-from .panel import FORMATO_PANEL, ConstructorPanel, periodos
+from .panel import FORMATO_PANEL, ConstructorPanel, huella_perfil, periodos
 from .panel_html import renderizar
 from .registro import Registro
 from .tiempo import Reloj
@@ -69,7 +69,8 @@ class Servicio:
     def panel_de_hoy(self) -> bool:
         """¿Ya está hecho el estudio de hoy? (para avisar al dueño de que el primero del día tarda unos minutos)."""
         return (bool(self._panel) and self._panel["meta"].get("estudio") == self.reloj_estudio.hoy().isoformat()
-                and self._panel["meta"].get("formato") == FORMATO_PANEL)
+                and self._panel["meta"].get("formato") == FORMATO_PANEL
+                and self._panel["meta"].get("huella") == huella_perfil(self.cfg))     # el perfil no ha cambiado
 
     async def dinero(self):
         """Formato de importes con la tasa de hoy: «2 926 CUP (3,80 USD)» (o al revés si la moneda principal es USD)."""

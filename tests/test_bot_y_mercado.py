@@ -184,3 +184,27 @@ async def test_negocio_en_cup_y_menu_de_comandos(servicio, monkeypatch):
     assert publicados["boton"] == "commands"
     registrados = {c for h in bot.app.handlers[0] for c in getattr(h, "commands", ())}
     assert all(c in registrados and len(d) <= 256 for c, d in MENU)
+
+
+async def test_el_analisis_incluye_los_anuncios_recien_capturados(tmp_path):
+    """Las capturas de la propia consulta se fechan al descargarse, después del inicio del análisis: deben contar."""
+    import json as _json
+    from datetime import datetime, timedelta
+
+    from controlador_mercado import JsonFileSource, SourceRegistry
+
+    from agente_central.tiempo import Reloj
+
+    inicio = datetime.fromisoformat("2026-10-07T12:00:00-04:00")
+    descarga = inicio + timedelta(minutes=3)            # la web se consulta con pausas: termina unos minutos después
+    anuncios = [{"listing_id": f"a{i}", "url": f"https://ejemplo.invalid/{i}", "title": "Aceite de girasol 1 L",
+                 "seller": f"v{i}", "province": "La Habana", "price": 4.0 + i / 10, "currency": "USD",
+                 "captured_at": (descarga + timedelta(seconds=i)).isoformat()} for i in range(8)]
+    ruta = tmp_path / "fuente"
+    ruta.mkdir()
+    (ruta / "web.json").write_text(_json.dumps({"source_id": "web", "source_name": "Web", "observations": anuncios}))
+    cfg = cargar(tmp_path / "datos")
+    mercado = ClienteMercado(cfg, Reloj(cfg.empresa["zona_horaria"], inicio), registro=SourceRegistry([JsonFileSource(ruta)]))
+    a = await mercado.analizar({"name": "aceite de girasol", "quantity": 1, "unit": "L"})
+    precios = a["price_statistics"]["by_currency"]["USD"]["presentation_price"]
+    assert precios["n"] == 8 and 4.3 <= precios["price_median"] <= 4.4

@@ -28,6 +28,7 @@ from .config import ruta
 from .tiempo import Reloj
 
 log = logging.getLogger(__name__)
+MARGEN_CAPTURA = timedelta(hours=2)    # duración máxima de una descarga (las webs se consultan con pausas)
 CACHE_INCOMPLETO_S = 15 * 60      # análisis pobres (pocos precios, fuentes caídas o vacías): reintentar pronto
 MIN_PRECIOS_CACHE = 5             # las webs a veces devuelven muy pocos resultados de forma puntual
 CAMPOS_PRODUCTO = ("name", "brand", "model", "variant", "quantity", "unit", "pack_count", "condition", "keywords",
@@ -119,10 +120,14 @@ class ClienteMercado:
         if self.m["provincias"] and not p.get("provinces"):
             p["provinces"] = list(self.m["provincias"])
         objetivo = TargetProduct.from_dict(p)
-        fin = self.reloj.ahora().astimezone(timezone.utc)
+        ahora = self.reloj.ahora().astimezone(timezone.utc)
+        historial = ahora - timedelta(weeks=int(self.m["semanas_historial"]))
+        # Las capturas de esta consulta se fechan al descargarse, después de "ahora": el periodo se cierra cuando
+        # termina la descarga (y con margen en la petición), o el análisis descartaría los anuncios recién capturados.
+        capturas = self.registro.fetch_all(objetivo, historial, ahora + MARGEN_CAPTURA)
+        fin = max(ahora, self.reloj.ahora().astimezone(timezone.utc),
+                  max((o.captured_at for c in capturas for o in c.observations if o.captured_at), default=ahora))
         inicio = fin - timedelta(days=int(self.m["dias_periodo"]))
-        historial = fin - timedelta(weeks=int(self.m["semanas_historial"]))
-        capturas = self.registro.fetch_all(objetivo, historial, fin)
         tasas = tasas_desde_fx(fx)
         res = MarketAnalyzer(AnalyzerConfig(granularity=self.m["granularidad"])).analyze(
             objetivo, [o for c in capturas for o in c.observations],

@@ -35,11 +35,12 @@ def periodos(hoy: date, meses_historial: int = 12) -> dict[str, date]:
 
 
 class ConstructorPanel:
-    def __init__(self, cfg, interno: Interno, mercado: ClienteMercado, reloj: Reloj):
+    def __init__(self, cfg, interno: Interno, mercado: ClienteMercado, reloj: Reloj, reloj_estudio: Reloj | None = None):
         self.cfg = cfg
         self.interno = interno
         self.mercado = mercado
-        self.reloj = reloj
+        self.reloj = reloj                              # negocio (congelado en el modo demo)
+        self.reloj_estudio = reloj_estudio or reloj      # fecha real del estudio
 
     async def _h(self, nombre: str, params: dict, avisos: list[str]) -> dict | None:
         res = await self.interno.herramienta(nombre, params)
@@ -107,7 +108,8 @@ class ConstructorPanel:
             "meta": {
                 "empresa": {k: cfg.empresa.get(k) for k in ("id", "nombre", "descripcion", "pais", "moneda", "moneda_local")},
                 "titulo": cfg["panel"]["titulo"], "proveedor": cfg["marca"]["proveedor"],
-                "generado": self.reloj.ahora().isoformat(timespec="minutes"),
+                "generado": self.reloj_estudio.ahora().isoformat(timespec="minutes"),
+                "estudio": self.reloj_estudio.hoy().isoformat(),
                 "periodo": {"desde": mes["from"], "hasta": mes["to"]},
                 "demo": cfg["interno"]["modo"] == "demo",
                 "agente_central": __version__,

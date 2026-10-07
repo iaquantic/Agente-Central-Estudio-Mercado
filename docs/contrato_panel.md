@@ -6,7 +6,7 @@ Campos en español; los bloques que vienen tal cual del Agente Interno conservan
 | Campo | Origen | Contenido |
 |---|---|---|
 | `version` | Central | `"1.0"` |
-| `meta` | Central | `empresa{id,nombre,descripcion,pais,moneda,moneda_local}`, `titulo`, `proveedor`, `generado`, `periodo{desde,hasta}`, `demo`, `agente_central`, `zona_horaria`, `umbral_precio_pct`, `fuentes_mercado[]` |
+| `meta` | Central | `empresa{id,nombre,descripcion,pais,moneda,moneda_local}`, `titulo`, `proveedor`, `generado` (hora real del estudio), `estudio` (fecha real del estudio), `periodo{desde,hasta}` (del negocio), `demo`, `agente_central`, `zona_horaria`, `umbral_precio_pct`, `fuentes_mercado[]` |
 | `resumen` | Interno · `get_business_summary` | Día y mes en curso, esperado, alertas por prioridad |
 | `ventas_mensuales[]` | Interno · `get_sales_summary` (`group_by=month`) | 12 meses: `key`, `net_usd`, `gross_margin_pct`, `tickets`, `units` |
 | `ventas_mes` | Interno · `get_sales_summary` (`category`, `previous_period`) | `totales`, `comparacion`, `categorias[]` |

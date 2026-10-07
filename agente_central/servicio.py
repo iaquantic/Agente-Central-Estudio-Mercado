@@ -21,18 +21,17 @@ TASA_CACHE_S = 3600
 
 class Servicio:
     def __init__(self, cfg: Config, *, interno=None, mercado: ClienteMercado | None = None, reloj: Reloj | None = None,
-                 cliente_claude=None):
+                 cliente_claude=None, reloj_estudio: Reloj | None = None):
         self.cfg = cfg
         self.reloj = reloj or Reloj(cfg.empresa["zona_horaria"], cfg.ahora_fija)
+        # El estudio de mercado y su fecha van siempre en tiempo real (los anuncios son de hoy), aunque el negocio de
+        # demostración tenga la hora congelada (demo.ahora solo afecta al Agente Interno y al periodo del negocio).
+        self.reloj_estudio = reloj_estudio or Reloj(cfg.empresa["zona_horaria"])
         self.interno = interno or crear_cliente_interno(cfg, self.reloj)
-        # El mercado se mide siempre en tiempo real (los anuncios son de hoy), aunque el negocio de demostración
-        # tenga la hora congelada (demo.ahora solo afecta al Agente Interno y al periodo del panel).
-        self.mercado = mercado or ClienteMercado(cfg, Reloj(cfg.empresa["zona_horaria"]),
-                                                 directorio_cache=cfg.directorio_datos / "mercado")
-        self.constructor = ConstructorPanel(cfg, self.interno, self.mercado, self.reloj)
+        self.mercado = mercado or ClienteMercado(cfg, self.reloj_estudio, directorio_cache=cfg.directorio_datos / "mercado")
+        self.constructor = ConstructorPanel(cfg, self.interno, self.mercado, self.reloj, self.reloj_estudio)
         self.registro = Registro(cfg.directorio_datos / "registro.jsonl")
-        self._panel: dict | None = None
-        self._panel_t = 0.0
+        self._panel: dict | None = self._cargar()
         self._panel_lock = asyncio.Lock()
         self._tasa: tuple[float, dict | None, list] | None = None
         self._cliente_claude = cliente_claude
@@ -63,22 +62,32 @@ class Servicio:
         self._tasa = (time.monotonic(), fx, d.get("series") or [])
         return fx, self._tasa[2]
 
-    async def panel(self, *, forzar: bool = False, forzar_mercado: bool = False) -> dict:
-        """Último panel; se regenera si ha caducado (refresco_minutos) o si se fuerza.
+    def panel_de_hoy(self) -> bool:
+        """¿Ya está hecho el estudio de hoy? (para avisar al dueño de que el primero del día tarda unos minutos)."""
+        return bool(self._panel) and self._panel["meta"].get("estudio") == self.reloj_estudio.hoy().isoformat()
 
-        `forzar` rehace el panel con datos frescos del negocio; los análisis de mercado salen de su caché
-        (`mercado.cache_horas`) para no consultar las webs en cada refresco. `forzar_mercado` ignora esa caché."""
-        caducidad = float(self.cfg["panel"]["refresco_minutos"]) * 60
+    async def panel(self, *, forzar: bool = False, forzar_mercado: bool = False) -> dict:
+        """El estudio del día: se hace una sola vez al día (el primero que se pida o a `panel.hora_estudio`) y después
+        se reutiliza, también tras reiniciar el servicio (se guarda en panel.json).
+
+        Un estudio nuevo consulta siempre las webs de mercado. `forzar` rehace el panel en el mismo día con datos
+        frescos del negocio (los análisis de mercado salen de su caché); `forzar_mercado` también rehace el mercado."""
         async with self._panel_lock:
-            if forzar or forzar_mercado or self._panel is None or time.monotonic() - self._panel_t > caducidad:
+            nuevo_dia = not self.panel_de_hoy()
+            if forzar or forzar_mercado or nuevo_dia:
                 inicio = time.monotonic()
-                self._panel = await self.constructor.construir(forzar_mercado=forzar_mercado)
-                self._panel_t = time.monotonic()
+                self._panel = await self.constructor.construir(forzar_mercado=forzar_mercado or nuevo_dia)
                 self._guardar(self._panel)
                 await self.registro.evento("panel", {"ms": int((time.monotonic() - inicio) * 1000),
                                                      "propuestas": len(self._panel["propuestas"]),
                                                      "avisos": self._panel["calidad"]["avisos"]})
             return self._panel
+
+    def _cargar(self) -> dict | None:
+        try:
+            return json.loads((self.cfg.directorio_datos / "panel.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
 
     def _guardar(self, panel: dict) -> None:
         d = self.cfg.directorio_datos

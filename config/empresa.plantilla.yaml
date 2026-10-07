@@ -62,7 +62,7 @@ mercado:
 panel:
   meses_historial: 12
   top_n: 10
-  refresco_minutos: 60
+  hora_estudio: "07:30"      # un estudio al día: a esta hora o al primer /panel, lo que llegue antes
   titulo: Panel de estudio de mercado
 
 # Umbrales de las reglas de cruce negocio × mercado (docs/reglas_de_cruce.md)

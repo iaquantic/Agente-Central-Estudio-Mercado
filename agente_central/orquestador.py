@@ -57,6 +57,14 @@ class _Conversacion:
     turnos: int = 0
 
 
+FORMATO_IMPORTES = {
+    "CUP": "Importes: primero en CUP y, entre paréntesis, su equivalente en USD («2 926 CUP (3,80 USD)»). Los negocios "
+           "registran en USD: convierte con la tasa USD→CUP de hoy que traen las herramientas (`fx`) y dila al menos una vez.",
+    "USD": "Importes: primero en USD y, entre paréntesis, su equivalente en CUP a la tasa de hoy que traen las herramientas "
+           "(«3,80 USD (2 926 CUP)»).",
+}
+
+
 def cargar_prompt(cfg, canal: str) -> str:
     vigilados = "\n".join(f"- {p['sku']}: {json.dumps(p['mercado'], ensure_ascii=False)}" for p in cfg["catalogo_vigilado"]) \
         or "- (ninguno configurado)"
@@ -64,7 +72,7 @@ def cargar_prompt(cfg, canal: str) -> str:
     return (PROMPT.read_text(encoding="utf-8")
             .replace("{{EMPRESA}}", e["nombre"]).replace("{{DESCRIPCION}}", e.get("descripcion") or "negocio")
             .replace("{{PAIS}}", e.get("pais") or "").replace("{{ESTILO_CANAL}}", ESTILOS.get(canal, ESTILOS["cli"]))
-            .replace("{{VIGILADOS}}", vigilados))
+            .replace("{{VIGILADOS}}", vigilados).replace("{{FORMATO_IMPORTES}}", FORMATO_IMPORTES[cfg["panel"]["moneda_principal"]]))
 
 
 def _texto(contenido: list[Any]) -> str:

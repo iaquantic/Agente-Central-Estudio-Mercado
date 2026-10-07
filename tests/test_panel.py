@@ -10,7 +10,9 @@ def _prop(panel, sku):
 
 def test_panel_demo_completo(panel_demo):
     p = panel_demo
-    assert p["calidad"]["avisos"] == []
+    assert p["calidad"]["avisos"] == ["Falta ELTOQUE_API_KEY: se usa la última tasa del Agente Interno."]
+    assert p["meta"]["moneda_principal"] == "CUP" and p["meta"]["tasa_dia"]["usd_cup"] == 741.74
+    assert all("CUP (" in x["detalle"] for x in p["propuestas"] if "Vendes a" in x["detalle"])
     assert len(p["ventas_mensuales"]) == 12 and len(p["mas_vendidos"]) == 10 and len(p["menos_rentables"]) == 10
     assert p["tasa"]["actual"]["usd_cup"] == 741.74
     assert {x["sku"] for x in p["productos"]} == {"GRA-010", "GRA-012", "GRA-013", "GRA-014", "GRA-001", "CAR-001", "CLI-001", "ELE-003"}

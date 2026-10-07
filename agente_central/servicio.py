@@ -10,6 +10,7 @@ from pathlib import Path
 from .config import Config
 from .externo import ClienteMercado
 from .interno import crear_cliente_interno, datos, tasa
+from .moneda import TasaDia, fx_de
 from .panel import ConstructorPanel, periodos
 from .panel_html import renderizar
 from .registro import Registro
@@ -29,7 +30,8 @@ class Servicio:
         self.reloj_estudio = reloj_estudio or Reloj(cfg.empresa["zona_horaria"])
         self.interno = interno or crear_cliente_interno(cfg, self.reloj)
         self.mercado = mercado or ClienteMercado(cfg, self.reloj_estudio, directorio_cache=cfg.directorio_datos / "mercado")
-        self.constructor = ConstructorPanel(cfg, self.interno, self.mercado, self.reloj, self.reloj_estudio)
+        self.tasa_dia = TasaDia(self.reloj_estudio, cfg.directorio_datos / "tasa_dia.json", cfg.eltoque_api_key or "")
+        self.constructor = ConstructorPanel(cfg, self.interno, self.mercado, self.reloj, self.reloj_estudio, self.tasa_dia)
         self.registro = Registro(cfg.directorio_datos / "registro.jsonl")
         self._panel: dict | None = self._cargar()
         self._panel_lock = asyncio.Lock()
@@ -52,13 +54,14 @@ class Servicio:
         return self._orquestador
 
     async def tasa(self) -> tuple[dict | None, list]:
-        """Tasa del día y serie de 2 meses según el Agente Interno (caché 1 h)."""
+        """Tasa de hoy (elTOQUE, o la del Agente Interno si no hay clave) y serie de 2 meses del Agente Interno (caché 1 h)."""
         if self._tasa and time.monotonic() - self._tasa[0] < TASA_CACHE_S:
             return self._tasa[1], self._tasa[2]
         p = periodos(self.reloj.hoy())
         res = await self.interno.herramienta("get_exchange_rate", {"from": p["tasa_desde"].isoformat(), "to": p["hasta"].isoformat()})
         d = datos(res) or {}
         fx = d.get("today") or tasa(res)
+        fx = fx_de(await self.tasa_dia.obtener(fx)) or fx       # la de hoy (elTOQUE) si está disponible
         self._tasa = (time.monotonic(), fx, d.get("series") or [])
         return fx, self._tasa[2]
 

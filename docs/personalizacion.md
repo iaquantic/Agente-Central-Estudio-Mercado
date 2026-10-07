@@ -52,7 +52,7 @@ catalogo_vigilado:
   la misma presentación; las demás entran en el precio por unidad estándar.
 - `exclude_keywords`: términos que descartan anuncios confusos ("motor" para aceite, "recargable" para ventiladores de red).
 - Empieza por 8–15 productos clave (los de más ventas, los prioritarios y los que dan problemas). Cada producto vigilado
-  supone una consulta a cada fuente web en cada refresco.
+  supone una consulta a cada fuente web en cada estudio (uno al día).
 - Los productos no vigilados también se pueden preguntar por Telegram: el orquestador construye la búsqueda.
 
 Comprueba el resultado con:
@@ -62,6 +62,11 @@ EMPRESA_CONFIG=config/empresa.yaml python -m agente_central comprobar
 ```
 
 Muestra cada SKU con su nombre en el negocio (✗ si no existe) y las fuentes de mercado configuradas.
+
+### Moneda de los importes
+`panel.moneda_principal: CUP` (por defecto) muestra los importes en CUP, convertidos con la tasa informal de elTOQUE
+del día (`ELTOQUE_API_KEY`), y al lado su valor en USD: «2 926 CUP (3,80 USD)». Con `USD`, al revés. Los subagentes
+siguen trabajando en USD; la conversión solo afecta a cómo se presentan las cifras en el panel, el bot y las propuestas.
 
 ### Afinar las búsquedas
 Genera el panel y revisa en "Calidad de los datos y fuentes" la confianza de cada producto. Con confianza LOW o

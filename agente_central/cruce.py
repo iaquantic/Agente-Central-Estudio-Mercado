@@ -117,6 +117,36 @@ def referencia_mercado(analisis: dict, tasa: float | None) -> dict[str, Any]:
     }
 
 
+def _presentacion_objetivo(analisis: dict) -> str | None:
+    raw = (((analisis.get("product") or {}).get("presentation") or {}).get("raw_value")) or {}
+    q, u, pack = raw.get("quantity"), raw.get("unit"), raw.get("pack_count")
+    if q and u:
+        return f"{pack:g} × {q:g} {u}" if pack and pack > 1 else f"{q:g} {u}"
+    return f"{pack:g} u" if pack and pack > 1 else None
+
+
+def anuncios_referencia(analisis: dict, ref: dict, tasa: float | None) -> list[dict]:
+    """Anuncios en los que se basa la referencia, con su equivalente para la presentación del negocio (en USD).
+
+    `usado`: entró en la mediana de la referencia (misma presentación, o precio por unidad estándar si la referencia
+    se calculó así). Los atípicos y los de otra presentación se listan también para poder revisarlos.
+    """
+    cant = _bloques(analisis)[4]
+    por_unidad = ref.get("por_unidad_estandar")
+    salida = []
+    for a in analisis.get("anuncios") or []:
+        # Precio llevado a la presentación del negocio (un saco de 25 kg → su precio por 1 kg).
+        precio = a["precio_unidad"] * cant if a.get("precio_unidad") is not None and cant else a.get("precio")
+        if precio is not None and a.get("moneda") == "CUP":
+            precio = precio / tasa if tasa else None
+        elif a.get("moneda") not in ("USD", "CUP"):
+            precio = None
+        usado = bool(a.get("en_unidad") if por_unidad else a.get("en_presentacion"))
+        salida.append({**a, "usado": usado, "equivalente_usd": _r(precio)})
+    salida.sort(key=lambda a: (not a["usado"], a["equivalente_usd"] is None, a["equivalente_usd"] or 0))
+    return salida
+
+
 def serie_usd_equivalente(analisis: dict, tasas: SerieTasa) -> list[dict]:
     """Mediana semanal de mercado en USD equivalentes: USD nativos y CUP deflactados con la tasa de cada semana."""
     out = []
@@ -348,6 +378,9 @@ def cruzar(ficha: dict, semanas: list[dict], analisis: dict | None, *, fx: dict 
         "capturado": (analisis.get("analysis_period") or {}).get("captured_at_max"),
         "fuentes": [s.get("source_name") or s.get("source_id") for s in analisis.get("sources") or [] if s.get("status") == "ok"],
         "limitaciones": analisis.get("limitations") or [],
+        "anuncios": anuncios_referencia(analisis, ref, tasa_actual),
+        "anuncios_resumen": analisis.get("anuncios_resumen"),
+        "presentacion_objetivo": _presentacion_objetivo(analisis),
     }
     dif = _pct(ref.get("referencia_usd"), interno.get("precio_usd"))
     umbral = reglas_cfg["diferencia_precio_pct"]

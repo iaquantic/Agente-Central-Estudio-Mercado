@@ -173,6 +173,18 @@ details summary { cursor: pointer; color: var(--marca-acento-fuerte); font-size:
 :root[data-theme="dark"] details summary { color: #B4AEF5; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) details summary { color: #B4AEF5; } }
 details[open] summary { margin-bottom: 8px; }
+.refs { border-top: 1px solid var(--border); padding: 4px 0 8px; }
+.refs:first-child { border-top: 0; }
+.refs > summary { color: var(--fg); font-size: 14px; }
+.refs > summary b { font-family: var(--font-titulos); }
+.refs > summary .nota { display: block; margin: 2px 0 0 18px; }
+.refs table a { color: var(--marca-acento-fuerte); text-decoration: none; }
+.refs table a:hover { text-decoration: underline; }
+:root[data-theme="dark"] .refs table a { color: #B4AEF5; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .refs table a { color: #B4AEF5; } }
+.refs td.titulo { max-width: 380px; }
+.refs tr.no-usado td { color: var(--muted); }
+.uso { font-size: 12px; white-space: nowrap; }
 
 /* Inventario y alertas */
 .estados { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
@@ -227,6 +239,12 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
       <div class="leyenda"><span><i class="k-punto"></i>Tu precio</span><span><i class="k-mediana"></i>Mediana del mercado</span><span><i class="k-banda"></i>Mitad central de los anuncios (p25–p75)</span></div></header>
     <div class="posicion" id="posicion"></div>
     <details><summary>Ver como tabla</summary><div class="tabla-scroll" id="tabla-posicion"></div></details>
+  </section>
+
+  <section class="tarjeta" aria-labelledby="t-anuncios">
+    <header><div><div class="eyebrow">Mercado</div><h2 id="t-anuncios">Anuncios de referencia</h2></div>
+      <span class="nota">De dónde sale cada precio de mercado: los anuncios usados, con enlace al original</span></header>
+    <div id="anuncios"></div>
   </section>
 
   <section class="tarjeta" aria-labelledby="t-tendencias">
@@ -405,6 +423,28 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
     $("posicion").innerHTML = html;
     $("tabla-posicion").innerHTML = `<table><thead><tr><th>Producto</th><th class="num">Tu precio</th><th class="num">Mediana mercado</th><th class="num">p25</th><th class="num">p75</th><th class="num">Diferencia</th><th class="num">Anuncios</th><th>Confianza</th></tr></thead><tbody>${
       ps.map((p) => `<tr><td>${esc(p.nombre)}</td><td class="num">${usd(p.interno.precio_usd, 2)}</td><td class="num">${usd(p.mercado.referencia_usd, 2)}</td><td class="num">${usd(p.mercado.p25_usd, 2)}</td><td class="num">${usd(p.mercado.p75_usd, 2)}</td><td class="num">${pct(p.posicion.diferencia_pct)}</td><td class="num">${p.mercado.n}</td><td>${esc(p.mercado.confianza)}</td></tr>`).join("")}</tbody></table>`;
+  })();
+
+  // Anuncios de referencia ---------------------------------------------------------------------
+  (function anuncios() {
+    const ps = (D.productos || []).filter((p) => p.mercado && (p.mercado.anuncios || []).length);
+    if (!ps.length) { $("anuncios").innerHTML = '<p class="nota">Sin anuncios en este estudio.</p>'; return; }
+    const publicado = (a) => a.precio == null ? "—" : a.moneda === "CUP" ? nf0.format(a.precio) + " CUP" : nf2.format(a.precio) + " " + esc(a.moneda || "");
+    const enlace = (a) => /^https?:\/\//.test(a.url || "") ? `<a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(a.titulo || "anuncio")}</a>` : esc(a.titulo || "");
+    const uso = (a) => a.usado ? (a.atipico ? `En la referencia · precio ${a.atipico === "ALTO" ? "alto" : "bajo"}` : "✓ En la referencia")
+      : a.atipico ? `Atípico ${a.atipico === "ALTO" ? "alto" : "bajo"}: excluido` : "Otra presentación";
+    $("anuncios").innerHTML = ps.map((p) => {
+      const m = p.mercado, lista = m.anuncios, usados = lista.filter((a) => a.usado).length, r = m.anuncios_resumen || {};
+      const monedas = [m.n_cup ? `en CUP, mediana ${nf0.format(m.mediana_cup)} CUP (${m.n_cup} anuncios)` : "",
+                       m.n_usd ? `en USD, mediana ${nf2.format(m.mediana_usd)} USD (${m.n_usd} anuncios)` : ""].filter(Boolean).join(" · ");
+      return `<details class="refs"><summary><b>${esc(p.nombre)}</b>: referencia ${usd(m.referencia_usd, 2)} · ${nf0.format(m.n || usados)} anuncios usados${lista.length < (r.validos || 0) ? ` (se listan ${lista.length})` : ""}
+        <span class="nota">${m.presentacion_objetivo ? "Para " + esc(m.presentacion_objetivo) + ". " : ""}${monedas ? "Mercado " + monedas + ". " : ""}${m.base ? "Cálculo: " + esc(m.base) + "." : ""}</span></summary>
+        <p class="nota">Los precios de otras presentaciones se llevan a la del negocio con el precio por unidad (un saco de 25 kg → su precio por 1 kg).
+        ${r.duplicados ? `Se descartaron ${nf0.format(r.duplicados)} repeticiones del mismo anuncio. ` : ""}${r.atipicos ? `${nf0.format(r.atipicos)} con precio atípico (se marcan abajo).` : ""}</p>
+        <div class="tabla-scroll"><table><thead><tr><th>Fuente</th><th>Anuncio</th><th class="num">Precio publicado</th><th>Presentación</th><th class="num">Equivale a${m.presentacion_objetivo ? " (" + esc(m.presentacion_objetivo) + ")" : ""}</th><th>Uso</th><th>Visto</th></tr></thead><tbody>${
+          lista.map((a) => `<tr class="${a.usado ? "" : "no-usado"}"><td>${esc(a.fuente)}</td><td class="titulo">${enlace(a)}</td><td class="num">${publicado(a)}</td><td>${esc(a.presentacion || "—")}</td><td class="num">${usd(a.equivalente_usd, 2)}</td><td class="uso">${uso(a)}</td><td>${a.capturado ? fecha(a.capturado) : "—"}</td></tr>`).join("")
+        }</tbody></table></div></details>`;
+    }).join("");
   })();
 
   // Utilidades SVG ---------------------------------------------------------------------------

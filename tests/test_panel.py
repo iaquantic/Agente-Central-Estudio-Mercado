@@ -50,3 +50,23 @@ def test_marca_personalizable(panel_demo, cfg):
              "tipografias": {"titulos": "Montserrat", "texto": "Inter"}, "proveedor": "Otra Consultora"}
     h = renderizar(panel_demo, marca)
     assert "--marca-primario: #003300" in h and "family=Montserrat" in h and "Otra Consultora" in h
+
+
+def test_anuncios_de_referencia(panel_demo, cfg):
+    """Cada precio de mercado lleva los anuncios en los que se basa, con enlace y su uso en la referencia."""
+    for x in panel_demo["productos"]:
+        m = x["mercado"]
+        usados = [a for a in m["anuncios"] if a["usado"]]
+        assert usados and all(a["url"].startswith("https://") and a["equivalente_usd"] for a in usados)
+        assert len(usados) <= m["n"] and m["anuncios_resumen"]["validos"] >= len(m["anuncios"])
+        assert m["anuncios"].index(usados[-1]) == len(usados) - 1          # primero los usados, por precio
+    aceite = next(x for x in panel_demo["productos"] if x["sku"] == "GRA-010")["mercado"]
+    assert aceite["presentacion_objetivo"] == "1 L"
+    # La garrafa de 5 L se lleva a la presentación del negocio (1 L) por su precio por unidad, y no entra en la mediana.
+    garrafa = next(a for a in aceite["anuncios"] if a["presentacion"] == "5 litros")
+    assert not garrafa["usado"] and round(garrafa["equivalente_usd"], 2) == round(17500 / 5 / aceite["tasa_usd_cup"], 2)
+    pollo = next(x for x in panel_demo["productos"] if x["sku"] == "CAR-001")["mercado"]
+    anomalo = next(a for a in pollo["anuncios"] if a["precio"] == 95000)
+    assert anomalo["atipico"] == "ALTO" and not anomalo["usado"]
+    h = renderizar(panel_demo, cfg["marca"])
+    assert 'id="anuncios"' in h and "Anuncios de referencia" in h

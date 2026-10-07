@@ -29,7 +29,7 @@ def _meses_atras(d: date, n: int) -> date:
 
 # Versión del formato del panel: un panel guardado con otra versión se rehace aunque sea del mismo día
 # (p. ej. tras desplegar un cambio de presentación como los importes en CUP).
-FORMATO_PANEL = 3
+FORMATO_PANEL = 4
 
 def periodos(hoy: date, meses_historial: int = 12) -> dict[str, date]:
     lunes = hoy - timedelta(days=hoy.weekday())

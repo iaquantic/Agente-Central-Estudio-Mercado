@@ -28,6 +28,8 @@ from .config import ruta
 from .tiempo import Reloj
 
 log = logging.getLogger(__name__)
+VERSION_ANALISIS = 2     # cambia la clave de la caché cuando cambia lo que se guarda de cada análisis (2: anuncios)
+MAX_ANUNCIOS = 250       # anuncios de referencia que se guardan por producto
 MARGEN_CAPTURA = timedelta(hours=2)    # duración máxima de una descarga (las webs se consultan con pausas)
 CACHE_INCOMPLETO_S = 15 * 60      # análisis pobres (pocos precios, fuentes caídas o vacías): reintentar pronto
 MIN_PRECIOS_CACHE = 5             # las webs a veces devuelven muy pocos resultados de forma puntual
@@ -83,6 +85,47 @@ def tasas_desde_fx(fx: dict | None) -> list[ExchangeRate]:
     return [ExchangeRate("USD", "CUP", float(fx["usd_cup"]), as_of, str(fx.get("source") or "elTOQUE") + " (vía Agente Interno)")]
 
 
+def _presentacion(p: dict | None) -> str | None:
+    """«1 kg», «2 lb», «30 × 1 kg», «30 u» a partir de la presentación detectada en el anuncio."""
+    raw = (p or {}).get("raw_value") or {}
+    q, u, pack = raw.get("quantity"), raw.get("unit"), raw.get("pack_count")
+    base = f"{q:g} {u}" if q and u else None
+    if pack and pack > 1:
+        return f"{pack:g} × {base}" if base else f"{pack:g} u"
+    return base
+
+
+def anuncios_de(trazas: list[dict], nombres: dict[str, str]) -> tuple[list[dict], dict]:
+    """Anuncios válidos del producto (con precio y moneda) y para qué se usaron: son las referencias de los precios."""
+    salida, resumen = [], {"validos": 0, "duplicados": 0, "excluidos": 0, "atipicos": 0}
+    for t in trazas:
+        if (t.get("match") or {}).get("level") in (None, "NO_MATCH"):
+            continue                                         # otro producto (el historial guarda todas las búsquedas)
+        if t.get("status") == "duplicado":
+            resumen["duplicados"] += 1
+            continue
+        if t.get("status") != "valida":
+            resumen["excluidos"] += 1          # fuera del periodo, sin precio, de otra provincia…
+            continue
+        resumen["validos"] += 1
+        precio = ((t.get("price") or {}).get("normalized_value") or {})
+        atipico = (t.get("outlier") or {}).get("direction") or (t.get("unit_price_outlier") or {}).get("direction")
+        resumen["atipicos"] += bool(atipico)
+        salida.append({
+            "fuente": nombres.get(t.get("source_id")) or t.get("source_id"), "titulo": t.get("title"), "url": t.get("url"),
+            "precio": precio.get("price"), "moneda": precio.get("currency"),
+            "presentacion": _presentacion(t.get("presentation")),
+            "cantidad_estandar": (((t.get("presentation") or {}).get("normalized_value") or {}).get("standard_quantity")),
+            "unidad_estandar": (((t.get("presentation") or {}).get("normalized_value") or {}).get("standard_unit")),
+            "precio_unidad": t.get("unit_price"),
+            "en_presentacion": bool(t.get("used_in_price_stats")), "en_unidad": bool(t.get("used_in_unit_price_stats")),
+            "atipico": atipico, "coincidencia": (t.get("match") or {}).get("level"),
+            "provincia": t.get("province"), "capturado": (t.get("captured_at") or "")[:10],
+        })
+    salida.sort(key=lambda a: (not (a["en_presentacion"] or a["en_unidad"]), a["moneda"] or "", a["precio"] or 0))
+    return salida[:MAX_ANUNCIOS], resumen
+
+
 class ClienteMercado:
     def __init__(self, cfg, reloj: Reloj, *, registro: SourceRegistry | None = None, directorio_cache: Path | None = None):
         self.m = cfg["mercado"]
@@ -103,7 +146,7 @@ class ClienteMercado:
 
     # ------------------------------------------------------------------------------------- motor
     def _clave(self, producto: dict, fx: dict | None) -> str:
-        base = json.dumps({"p": producto, "fx": (fx or {}).get("date"), "prov": self.m["provincias"]}, sort_keys=True,
+        base = json.dumps({"v": VERSION_ANALISIS, "p": producto, "fx": (fx or {}).get("date"), "prov": self.m["provincias"]}, sort_keys=True,
                           ensure_ascii=False)
         return hashlib.sha256(base.encode()).hexdigest()[:16]
 
@@ -134,7 +177,10 @@ class ClienteMercado:
             analysis_start=inicio, analysis_end=fin, now=fin, exchange_rates=tasas,
             convert_to=self.m["convertir_a"] if tasas else None,
             source_status=[c.status_dict() for c in capturas])
-        res.pop("observations", None)       # la traza por observación no viaja al panel ni al modelo
+        trazas = res.pop("observations", None) or []   # la traza completa no viaja al panel ni al modelo
+        nombres = {c.source_id: c.source_name for c in capturas}
+        nombres.update({f.get("source_id"): f.get("source_name") for f in res.get("sources") or [] if f.get("source_name")})
+        res["anuncios"], res["anuncios_resumen"] = anuncios_de(trazas, nombres)
         return res
 
     async def analizar(self, producto: dict, *, fx: dict | None = None, forzar: bool = False) -> dict:

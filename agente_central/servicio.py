@@ -89,7 +89,13 @@ class Servicio:
                 inicio = time.monotonic()
                 log.info("Estudio del día: empieza (mercado %s)", "con consultas nuevas a las webs" if forzar_mercado or nuevo_dia
                          else "de la caché del día")
-                self._panel = await self.constructor.construir(forzar_mercado=forzar_mercado or nuevo_dia)
+                limite = float(self.cfg["panel"]["max_minutos_estudio"]) * 60
+                try:
+                    self._panel = await asyncio.wait_for(self.constructor.construir(forzar_mercado=forzar_mercado or nuevo_dia),
+                                                         timeout=limite)
+                except asyncio.TimeoutError:
+                    log.error("Estudio del día: no terminó en %d min (¿una fuente web no responde?)", limite / 60)
+                    raise TimeoutError(f"el estudio no terminó en {limite / 60:.0f} minutos") from None
                 self._guardar(self._panel)
                 log.info("Estudio del día: listo en %d s (%d productos, %d propuestas)", time.monotonic() - inicio,
                          len(self._panel["productos"]), len(self._panel["propuestas"]))

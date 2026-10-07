@@ -32,7 +32,7 @@ DEFECTOS: dict[str, Any] = {
                 "segmentos": {"calle": {"nombre": "mercado de calle", "fuentes": ["revolico"]},
                               "online": {"nombre": "tiendas online", "fuentes": ["cuballama", "cubamax", "cubatel"]}},
                 "referencia": "calle"},
-    "panel": {"meses_historial": 12, "top_n": 10, "hora_estudio": "07:30", "moneda_principal": "CUP", "titulo": "Panel de estudio de mercado"},
+    "panel": {"meses_historial": 12, "top_n": 10, "hora_estudio": "07:30", "max_minutos_estudio": 15, "moneda_principal": "CUP", "titulo": "Panel de estudio de mercado"},
     "reglas": {"margen_minimo_pct": 10, "diferencia_precio_pct": 8, "variacion_tendencia_pct": 8,
                "cobertura_minima_dias": 7, "dias_horizonte": 30,
                "diferencia_maxima_fiable_pct": 50},

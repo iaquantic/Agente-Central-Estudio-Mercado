@@ -90,7 +90,8 @@ class BotTelegram:
         tg = servicio.cfg["telegram"]
         self.limite = LimiteUso(int(tg["limite_consultas_hora"]))
         self.avisador = Avisador(servicio, servicio.cfg.directorio_datos / "alertas_enviadas.json")
-        self.app = Application.builder().token(token).build()
+        # Mensajes en paralelo: un /panel que espera al estudio del día no bloquea los demás comandos.
+        self.app = Application.builder().token(token).concurrent_updates(True).build()
         self._handlers()
 
     # Autorización -------------------------------------------------------------------------------
@@ -229,6 +230,8 @@ class BotTelegram:
                                               respuesta="panel enviado", estado="ok")
 
     async def _oportunidades(self, chat_id: int) -> None:
+        if not self.s.panel_de_hoy():
+            await self._enviar(chat_id, "⏳ Preparando el estudio de hoy (negocio + mercado). Tarda unos minutos.")
         p = await self.s.panel()
         await self._enviar(chat_id, "💡 <b>Decisiones propuestas</b>\n\n" + propuestas_html(p["propuestas"], limite=6, dinero=dinero_de_panel(p)))
 

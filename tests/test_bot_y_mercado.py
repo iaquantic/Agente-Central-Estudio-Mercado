@@ -224,3 +224,19 @@ async def test_si_algo_falla_el_bot_contesta(servicio, monkeypatch):
     await bot._error(NS(effective_chat=NS(id=99)), NS(error=RuntimeError("caída")))      # desconocido: no se le contesta
     assert enviados == [(42, "⚠️ No pude completar la petición (RuntimeError). Ha quedado registrado; "
                              "inténtalo de nuevo en unos minutos.")]
+
+
+async def test_estudio_con_tiempo_maximo_y_bot_en_paralelo(tmp_path):
+    import asyncio
+
+    cfg = cargar(tmp_path / "datos")
+    cfg.datos["panel"]["max_minutos_estudio"] = 0.002            # ~0,1 s
+    s = crear_servicio(cfg, tmp_path)
+
+    async def colgado(**kw):
+        await asyncio.sleep(5)
+    s.constructor.construir = colgado
+    with pytest.raises(TimeoutError, match="no terminó"):
+        await s.panel()
+    assert not s._panel_lock.locked()                              # el siguiente intento no queda bloqueado
+    assert BotTelegram(s, "123456:ABCDEF", (42,)).app.concurrent_updates > 1

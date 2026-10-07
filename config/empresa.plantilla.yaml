@@ -69,7 +69,7 @@ panel:
   meses_historial: 12
   top_n: 10
   moneda_principal: CUP      # importes en CUP (a la tasa de elTOQUE del día) con su equivalente en USD; o USD
-  hora_estudio: "07:30"      # un estudio al día: a esta hora o al primer /panel, lo que llegue antes
+  horas_estudio: ["08:00", "16:00"]   # hora de la empresa: un estudio en cada turno (con consultas nuevas a las webs)
   titulo: Panel de estudio de mercado
 
 # Umbrales de las reglas de cruce negocio × mercado (docs/reglas_de_cruce.md)

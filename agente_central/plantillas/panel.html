@@ -364,7 +364,8 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
   $("meta").innerHTML = [
     M.demo ? '<span class="pastilla demo">Negocio de demostración · mercado en vivo</span>' : "",
     `<span class="pastilla">${M.demo ? "Negocio (datos de prueba)" : "Periodo"}: ${fecha(M.periodo.desde)} – ${fecha(M.periodo.hasta)}</span>`,
-    M.estudio ? `<span class="pastilla">Estudio de mercado del ${fecha(M.estudio)}</span>` : "",
+    M.turno ? `<span class="pastilla">Estudio de mercado del ${fechaHora(M.turno)}</span>`
+            : M.estudio ? `<span class="pastilla">Estudio de mercado del ${fecha(M.estudio)}</span>` : "",
     TASA ? `<span class="pastilla">1 USD = ${nf2.format(TASA)} CUP · ${esc(TASA_DIA.fuente || "")}${TASA_DIA.fecha ? " · " + fecha(TASA_DIA.fecha) : ""}</span>`
          : fx ? `<span class="pastilla">1 USD = ${nf2.format(fx.usd_cup)} CUP · ${esc(fx.source)}</span>` : "",
     M.referencia_mercado ? `<span class="pastilla">Referencia: ${esc(M.referencia_mercado)}</span>` : "",

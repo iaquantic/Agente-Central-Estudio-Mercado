@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import os
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -32,7 +33,7 @@ DEFECTOS: dict[str, Any] = {
                 "segmentos": {"calle": {"nombre": "mercado de calle", "fuentes": ["revolico"]},
                               "online": {"nombre": "tiendas online", "fuentes": ["cuballama", "cubamax", "cubatel"]}},
                 "referencia": "calle"},
-    "panel": {"meses_historial": 12, "top_n": 10, "hora_estudio": "07:30", "max_minutos_estudio": 15, "moneda_principal": "CUP", "titulo": "Panel de estudio de mercado"},
+    "panel": {"meses_historial": 12, "top_n": 10, "horas_estudio": ["08:00", "16:00"], "max_minutos_estudio": 15, "moneda_principal": "CUP", "titulo": "Panel de estudio de mercado"},
     "reglas": {"margen_minimo_pct": 10, "diferencia_precio_pct": 8, "variacion_tendencia_pct": 8,
                "cobertura_minima_dias": 7, "dias_horizonte": 30,
                "diferencia_maxima_fiable_pct": 50},
@@ -150,6 +151,9 @@ class Config:
             raise ErrorConfig(f"interno.modo debe ser uno de {MODOS_INTERNO}")
         if d["mercado"]["modo"] not in MODOS_MERCADO:
             raise ErrorConfig(f"mercado.modo debe ser uno de {MODOS_MERCADO}")
+        horas = d["panel"]["horas_estudio"]
+        if not isinstance(horas, list) or not horas or not all(re.fullmatch(r"\d{1,2}:\d{2}", str(h)) for h in horas):
+            raise ErrorConfig("panel.horas_estudio debe ser una lista de horas HH:MM, p. ej. [\"08:00\", \"16:00\"]")
         segs = d["mercado"]["segmentos"] or {}
         if any(not (s or {}).get("fuentes") for s in segs.values()):
             raise ErrorConfig("Cada segmento de mercado.segmentos necesita 'fuentes'")

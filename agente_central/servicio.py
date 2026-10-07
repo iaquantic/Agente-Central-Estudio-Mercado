@@ -5,6 +5,8 @@ import asyncio
 import json
 import logging
 import time
+from datetime import datetime, timedelta
+from datetime import time as time_
 from pathlib import Path
 
 from .config import Config
@@ -67,11 +69,22 @@ class Servicio:
         self._tasa = (time.monotonic(), fx, d.get("series") or [])
         return fx, self._tasa[2]
 
-    def panel_de_hoy(self) -> bool:
-        """¿Ya está hecho el estudio de hoy? (para avisar al dueño de que el primero del día tarda unos minutos)."""
-        return (bool(self._panel) and self._panel["meta"].get("estudio") == self.reloj_estudio.hoy().isoformat()
+    def turno_actual(self) -> datetime:
+        """Inicio del turno de estudio vigente: la última de `panel.horas_estudio` que ya ha pasado hoy o, antes de
+        la primera, la última de ayer (con 08:00 y 16:00: a las 10:00 vale el de las 08:00; a las 06:00, el de ayer 16:00)."""
+        ahora = self.reloj_estudio.ahora()
+        horas = sorted(time_(*map(int, h.split(":"))) for h in self.cfg["panel"]["horas_estudio"])
+        pasados = [datetime.combine(ahora.date(), h, ahora.tzinfo) for h in horas
+                   if datetime.combine(ahora.date(), h, ahora.tzinfo) <= ahora]
+        return pasados[-1] if pasados else datetime.combine(ahora.date() - timedelta(days=1), horas[-1], ahora.tzinfo)
+
+    def panel_vigente(self) -> bool:
+        """¿Está hecho el estudio del turno actual? (si no, el siguiente /panel lo hace y tarda unos minutos)."""
+        return (bool(self._panel) and self._panel["meta"].get("turno") == self.turno_actual().isoformat(timespec="minutes")
                 and self._panel["meta"].get("formato") == FORMATO_PANEL
                 and self._panel["meta"].get("huella") == huella_perfil(self.cfg))     # el perfil no ha cambiado
+
+    panel_de_hoy = panel_vigente          # nombre anterior
 
     async def dinero(self):
         """Formato de importes con la tasa de hoy: «2 926 CUP (3,80 USD)» (o al revés si la moneda principal es USD)."""
@@ -79,26 +92,28 @@ class Servicio:
         return formateador((fx or {}).get("usd_cup"), self.cfg["panel"]["moneda_principal"])
 
     async def panel(self, *, forzar: bool = False, forzar_mercado: bool = False) -> dict:
-        """El estudio del día: se hace una sola vez al día (el primero que se pida o a `panel.hora_estudio`) y después
-        se reutiliza, también tras reiniciar el servicio (se guarda en panel.json).
+        """El estudio del turno: se hace una vez por turno de `panel.horas_estudio` (a esa hora o con el primer /panel
+        del turno) y se reutiliza hasta el siguiente, también tras reiniciar el servicio (se guarda en panel.json).
 
         Un estudio nuevo consulta siempre las webs de mercado. `forzar` rehace el panel en el mismo día con datos
         frescos del negocio (los análisis de mercado salen de su caché); `forzar_mercado` también rehace el mercado."""
         async with self._panel_lock:
-            nuevo_dia = not (self._panel and self._panel["meta"].get("estudio") == self.reloj_estudio.hoy().isoformat())
-            if forzar or forzar_mercado or not self.panel_de_hoy():     # día nuevo o panel de un formato anterior
+            turno = self.turno_actual().isoformat(timespec="minutes")
+            nuevo_dia = not (self._panel and self._panel["meta"].get("turno") == turno)     # turno nuevo: webs de nuevo
+            if forzar or forzar_mercado or not self.panel_vigente():     # turno nuevo o panel de un formato anterior
                 inicio = time.monotonic()
-                log.info("Estudio del día: empieza (mercado %s)", "con consultas nuevas a las webs" if forzar_mercado or nuevo_dia
-                         else "de la caché del día")
+                log.info("Estudio del turno: empieza (mercado %s)", "con consultas nuevas a las webs" if forzar_mercado or nuevo_dia
+                         else "de la caché")
                 limite = float(self.cfg["panel"]["max_minutos_estudio"]) * 60
                 try:
                     self._panel = await asyncio.wait_for(self.constructor.construir(forzar_mercado=forzar_mercado or nuevo_dia),
                                                          timeout=limite)
                 except asyncio.TimeoutError:
-                    log.error("Estudio del día: no terminó en %d min (¿una fuente web no responde?)", limite / 60)
+                    log.error("Estudio del turno: no terminó en %d min (¿una fuente web no responde?)", limite / 60)
                     raise TimeoutError(f"el estudio no terminó en {limite / 60:.0f} minutos") from None
+                self._panel["meta"]["turno"] = turno
                 self._guardar(self._panel)
-                log.info("Estudio del día: listo en %d s (%d productos, %d propuestas)", time.monotonic() - inicio,
+                log.info("Estudio del turno: listo en %d s (%d productos, %d propuestas)", time.monotonic() - inicio,
                          len(self._panel["productos"]), len(self._panel["propuestas"]))
                 await self.registro.evento("panel", {"ms": int((time.monotonic() - inicio) * 1000),
                                                      "propuestas": len(self._panel["propuestas"]),

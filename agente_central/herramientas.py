@@ -158,8 +158,12 @@ def compactar_cruce(c: dict) -> dict:
     """El cruce sin series largas (el modelo no las necesita enteras)."""
     out = json.loads(json.dumps(c, default=str))
     if out.get("mercado"):
-        serie = out["mercado"].pop("serie_usd", [])
-        out["mercado"]["serie_usd_resumen"] = [s for s in serie if s.get("usd") is not None][-6:]
+        for m in [out["mercado"], *(out["mercado"].get("segmentos") or {}).values()]:
+            serie = m.pop("serie_usd", [])
+            m["serie_usd_resumen"] = [s for s in serie if s.get("usd") is not None][-6:]
+            anuncios = m.pop("anuncios_ref", None) or []
+            m["anuncios_ejemplo"] = [{k: a.get(k) for k in ("fuente", "titulo", "precio", "moneda", "presentacion", "url")}
+                                     for a in anuncios if a.get("usado")][:5]
     if out.get("interno"):
         out["interno"]["serie_semanal"] = out["interno"]["serie_semanal"][-6:]
     return out

@@ -17,6 +17,7 @@ import hashlib
 import json
 import logging
 import time
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -28,7 +29,7 @@ from .config import ruta
 from .tiempo import Reloj
 
 log = logging.getLogger(__name__)
-VERSION_ANALISIS = 2     # cambia la clave de la caché cuando cambia lo que se guarda de cada análisis (2: anuncios)
+VERSION_ANALISIS = 4     # cambia la clave de la caché cuando cambia lo que se guarda (2: anuncios; 3: segmentos)
 MAX_ANUNCIOS = 250       # anuncios de referencia que se guardan por producto
 MARGEN_CAPTURA = timedelta(hours=2)    # duración máxima de una descarga (las webs se consultan con pausas)
 CACHE_INCOMPLETO_S = 15 * 60      # análisis pobres (pocos precios, fuentes caídas o vacías): reintentar pronto
@@ -85,6 +86,12 @@ def tasas_desde_fx(fx: dict | None) -> list[ExchangeRate]:
     return [ExchangeRate("USD", "CUP", float(fx["usd_cup"]), as_of, str(fx.get("source") or "elTOQUE") + " (vía Agente Interno)")]
 
 
+def de_fuentes(source_id: str | None, fuentes: list[str]) -> bool:
+    """¿El anuncio es de alguna de esas fuentes? «cuballama» incluye cuballama_mercado y cuballama_envios."""
+    sid = (source_id or "").lower()
+    return any(sid == f or sid.startswith(f + "_") or sid.startswith(f + ":") for f in fuentes)
+
+
 def _presentacion(p: dict | None) -> str | None:
     """«1 kg», «2 lb», «30 × 1 kg», «30 u» a partir de la presentación detectada en el anuncio."""
     raw = (p or {}).get("raw_value") or {}
@@ -95,9 +102,34 @@ def _presentacion(p: dict | None) -> str | None:
     return base
 
 
-def anuncios_de(trazas: list[dict], nombres: dict[str, str]) -> tuple[list[dict], dict]:
+def moneda_mal_puesta(trazas: list[dict], usd_cup: float | None) -> set[str]:
+    """Anuncios publicados «en USD» cuyo importe solo cuadra en CUP (p. ej. café de 250 g a 1 400 «USD» en Revolico).
+
+    Criterio: con al menos 3 anuncios del producto en CUP, un precio en USD que es más de 20 veces la mediana en CUP
+    (pasada a USD) y que, leído como CUP, queda entre 0,2 y 5 veces esa mediana.
+    """
+    if not usd_cup:
+        return set()
+    validos = [t for t in trazas if t.get("status") == "valida" and (t.get("match") or {}).get("level") not in (None, "NO_MATCH")
+               and (t.get("match") or {}).get("presentation_status") in ("MISMA", "NO_ESPECIFICADA")]
+    cup = sorted(((t.get("price") or {}).get("normalized_value") or {}).get("price") for t in validos
+                 if ((t.get("price") or {}).get("normalized_value") or {}).get("currency") == "CUP")
+    cup = [x for x in cup if x]
+    if len(cup) < 3:
+        return set()
+    ref = cup[len(cup) // 2] / usd_cup                       # mediana en CUP, en USD
+    salida = set()
+    for t in validos:
+        v = (t.get("price") or {}).get("normalized_value") or {}
+        p = v.get("price")
+        if v.get("currency") == "USD" and p and p >= 20 * ref and 0.2 * ref <= p / usd_cup <= 5 * ref:
+            salida.add(t.get("observation_id"))
+    return salida
+
+
+def anuncios_de(trazas: list[dict], nombres: dict[str, str], corregidos: set[str] | None = None) -> tuple[list[dict], dict]:
     """Anuncios válidos del producto (con precio y moneda) y para qué se usaron: son las referencias de los precios."""
-    salida, resumen = [], {"validos": 0, "duplicados": 0, "excluidos": 0, "atipicos": 0}
+    salida, resumen = [], {"validos": 0, "duplicados": 0, "excluidos": 0, "atipicos": 0, "moneda_corregida": len(corregidos or ())}
     for t in trazas:
         if (t.get("match") or {}).get("level") in (None, "NO_MATCH"):
             continue                                         # otro producto (el historial guarda todas las búsquedas)
@@ -120,6 +152,7 @@ def anuncios_de(trazas: list[dict], nombres: dict[str, str]) -> tuple[list[dict]
             "precio_unidad": t.get("unit_price"),
             "en_presentacion": bool(t.get("used_in_price_stats")), "en_unidad": bool(t.get("used_in_unit_price_stats")),
             "atipico": atipico, "coincidencia": (t.get("match") or {}).get("level"),
+            "moneda_corregida": t.get("observation_id") in (corregidos or set()),
             "provincia": t.get("province"), "capturado": (t.get("captured_at") or "")[:10],
         })
     salida.sort(key=lambda a: (not (a["en_presentacion"] or a["en_unidad"]), a["moneda"] or "", a["precio"] or 0))
@@ -146,7 +179,7 @@ class ClienteMercado:
 
     # ------------------------------------------------------------------------------------- motor
     def _clave(self, producto: dict, fx: dict | None) -> str:
-        base = json.dumps({"v": VERSION_ANALISIS, "p": producto, "fx": (fx or {}).get("date"), "prov": self.m["provincias"]}, sort_keys=True,
+        base = json.dumps({"v": VERSION_ANALISIS, "seg": self.m.get("segmentos"), "p": producto, "fx": (fx or {}).get("date"), "prov": self.m["provincias"]}, sort_keys=True,
                           ensure_ascii=False)
         return hashlib.sha256(base.encode()).hexdigest()[:16]
 
@@ -172,15 +205,34 @@ class ClienteMercado:
                   max((o.captured_at for c in capturas for o in c.observations if o.captured_at), default=ahora))
         inicio = fin - timedelta(days=int(self.m["dias_periodo"]))
         tasas = tasas_desde_fx(fx)
-        res = MarketAnalyzer(AnalyzerConfig(granularity=self.m["granularidad"])).analyze(
-            objetivo, [o for c in capturas for o in c.observations],
-            analysis_start=inicio, analysis_end=fin, now=fin, exchange_rates=tasas,
-            convert_to=self.m["convertir_a"] if tasas else None,
-            source_status=[c.status_dict() for c in capturas])
-        trazas = res.pop("observations", None) or []   # la traza completa no viaja al panel ni al modelo
         nombres = {c.source_id: c.source_name for c in capturas}
-        nombres.update({f.get("source_id"): f.get("source_name") for f in res.get("sources") or [] if f.get("source_name")})
-        res["anuncios"], res["anuncios_resumen"] = anuncios_de(trazas, nombres)
+
+        def analizar(obs: list, estados: list) -> dict:
+            def una_vez(lista: list) -> tuple[dict, list]:
+                r = MarketAnalyzer(AnalyzerConfig(granularity=self.m["granularidad"])).analyze(
+                    objetivo, lista, analysis_start=inicio, analysis_end=fin, now=fin, exchange_rates=tasas,
+                    convert_to=self.m["convertir_a"] if tasas else None, source_status=estados)
+                return r, r.pop("observations", None) or []   # la traza completa no viaja al panel ni al modelo
+
+            r, trazas = una_vez(obs)
+            corregidos = moneda_mal_puesta(trazas, (fx or {}).get("usd_cup"))
+            if corregidos:                                     # se repite el análisis con la moneda corregida
+                obs = [replace(o, currency="CUP") if o.observation_id in corregidos else o for o in obs]
+                r, trazas = una_vez(obs)
+            nombres.update({f.get("source_id"): f.get("source_name") for f in r.get("sources") or [] if f.get("source_name")})
+            r["anuncios"], r["anuncios_resumen"] = anuncios_de(trazas, nombres, corregidos)
+            return r
+
+        todas = [o for c in capturas for o in c.observations]
+        res = analizar(todas, [c.status_dict() for c in capturas])
+        # Cada mercado (calle, tiendas online…) se analiza por separado: sus precios no se mezclan y los atípicos se
+        # detectan dentro de su propio mercado.
+        res["segmentos"] = {}
+        for clave, seg in (self.m.get("segmentos") or {}).items():
+            obs = [o for o in todas if de_fuentes(o.source_id, seg["fuentes"])]
+            if obs:
+                res["segmentos"][clave] = analizar(
+                    obs, [c.status_dict() for c in capturas if de_fuentes(c.source_id, seg["fuentes"])])
         return res
 
     async def analizar(self, producto: dict, *, fx: dict | None = None, forzar: bool = False) -> dict:

@@ -58,6 +58,12 @@ mercado:
   dias_periodo: 7             # ventana de precios actuales
   semanas_historial: 12       # ventana para tendencias
   cache_horas: 12
+  # Mercados que se analizan y muestran por separado (cada uno con sus fuentes). Las propuestas se calculan contra
+  # `referencia`: calle si el negocio vende a clientes locales; online si compite con las tiendas para enviar desde fuera.
+  segmentos:
+    calle: {nombre: mercado de calle, fuentes: [revolico]}
+    online: {nombre: tiendas online, fuentes: [cuballama, cubamax, cubatel]}
+  referencia: calle
 
 panel:
   meses_historial: 12

@@ -29,7 +29,16 @@ def _meses_atras(d: date, n: int) -> date:
 
 # Versión del formato del panel: un panel guardado con otra versión se rehace aunque sea del mismo día
 # (p. ej. tras desplegar un cambio de presentación como los importes en CUP).
-FORMATO_PANEL = 4
+FORMATO_PANEL = 5
+
+
+def huella_perfil(cfg) -> str:
+    """Resumen de la parte del perfil que cambia el estudio: si cambia, el panel del día se rehace."""
+    import hashlib
+    import json
+    datos = {"mercado": {k: cfg["mercado"].get(k) for k in ("segmentos", "referencia", "fuentes", "provincias")},
+             "moneda": cfg["panel"]["moneda_principal"], "vigilados": cfg["catalogo_vigilado"], "reglas": cfg["reglas"]}
+    return hashlib.sha256(json.dumps(datos, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()[:12]
 
 def periodos(hoy: date, meses_historial: int = 12) -> dict[str, date]:
     lunes = hoy - timedelta(days=hoy.weekday())
@@ -77,7 +86,8 @@ class ConstructorPanel:
             analisis = None
         return cruzar(ficha, (hist or {}).get("series") or [], analisis, fx=fx, serie_fx=serie_fx,
                       reglas_cfg=self.cfg["reglas"], hoy=self.reloj.hoy(),
-                      dinero=formateador((fx or {}).get("usd_cup"), self.cfg["panel"]["moneda_principal"]))
+                      dinero=formateador((fx or {}).get("usd_cup"), self.cfg["panel"]["moneda_principal"]),
+                      segmentos_cfg=self.cfg["mercado"]["segmentos"], referencia=self.cfg["mercado"]["referencia"])
 
     async def construir(self, *, forzar_mercado: bool = False) -> dict[str, Any]:
         cfg, hoy = self.cfg, self.reloj.hoy()
@@ -124,9 +134,11 @@ class ConstructorPanel:
                 "generado": self.reloj_estudio.ahora().isoformat(timespec="minutes"),
                 "estudio": self.reloj_estudio.hoy().isoformat(),
                 "formato": FORMATO_PANEL,
+                "huella": huella_perfil(cfg),
                 "tasa_dia": tasa_dia or (fx and {"usd_cup": fx.get("usd_cup"), "fecha": str(fx.get("date") or "")[:10],
                                                  "fuente": fx.get("source")}),
                 "moneda_principal": cfg["panel"]["moneda_principal"],
+                "referencia_mercado": ((cfg["mercado"]["segmentos"] or {}).get(cfg["mercado"]["referencia"]) or {}).get("nombre"),
                 "periodo": {"desde": mes["from"], "hasta": mes["to"]},
                 "demo": cfg["interno"]["modo"] == "demo",
                 "agente_central": __version__,

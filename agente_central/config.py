@@ -27,7 +27,11 @@ DEFECTOS: dict[str, Any] = {
     "interno": {"modo": "api", "url": "http://127.0.0.1:8080/v1/consulta", "token_env": "ORQUESTADOR_TOKEN",
                 "timeout_s": 30, "fixtures": "demo/interno/fixtures.json"},
     "mercado": {"modo": "motor", "fuentes": [], "provincias": [], "convertir_a": "USD", "granularidad": "week",
-                "dias_periodo": 7, "semanas_historial": 12, "cache_horas": 12},
+                "dias_periodo": 7, "semanas_historial": 12, "cache_horas": 12,
+                # Mercados que se comparan por separado (por fuente) y cuál es la referencia de las propuestas.
+                "segmentos": {"calle": {"nombre": "mercado de calle", "fuentes": ["revolico"]},
+                              "online": {"nombre": "tiendas online", "fuentes": ["cuballama", "cubamax", "cubatel"]}},
+                "referencia": "calle"},
     "panel": {"meses_historial": 12, "top_n": 10, "hora_estudio": "07:30", "moneda_principal": "CUP", "titulo": "Panel de estudio de mercado"},
     "reglas": {"margen_minimo_pct": 10, "diferencia_precio_pct": 8, "variacion_tendencia_pct": 8,
                "cobertura_minima_dias": 7, "dias_horizonte": 30,
@@ -146,6 +150,11 @@ class Config:
             raise ErrorConfig(f"interno.modo debe ser uno de {MODOS_INTERNO}")
         if d["mercado"]["modo"] not in MODOS_MERCADO:
             raise ErrorConfig(f"mercado.modo debe ser uno de {MODOS_MERCADO}")
+        segs = d["mercado"]["segmentos"] or {}
+        if any(not (s or {}).get("fuentes") for s in segs.values()):
+            raise ErrorConfig("Cada segmento de mercado.segmentos necesita 'fuentes'")
+        if segs and d["mercado"]["referencia"] not in segs:
+            raise ErrorConfig(f"mercado.referencia debe ser uno de: {', '.join(segs)}")
         if self.datos["panel"]["moneda_principal"] not in ("CUP", "USD"):
             raise ErrorConfig("panel.moneda_principal debe ser CUP o USD")
         for f in d["mercado"]["fuentes"]:

@@ -56,17 +56,48 @@ def test_anuncios_de_referencia(panel_demo, cfg):
     """Cada precio de mercado lleva los anuncios en los que se basa, con enlace y su uso en la referencia."""
     for x in panel_demo["productos"]:
         m = x["mercado"]
-        usados = [a for a in m["anuncios"] if a["usado"]]
+        usados = [a for a in m["anuncios_ref"] if a["usado"]]
         assert usados and all(a["url"].startswith("https://") and a["equivalente_usd"] for a in usados)
-        assert len(usados) <= m["n"] and m["anuncios_resumen"]["validos"] >= len(m["anuncios"])
-        assert m["anuncios"].index(usados[-1]) == len(usados) - 1          # primero los usados, por precio
+        assert len(usados) <= m["n"] and m["anuncios_resumen"]["validos"] >= len(m["anuncios_ref"])
+        assert m["anuncios_ref"].index(usados[-1]) == len(usados) - 1          # primero los usados, por precio
     aceite = next(x for x in panel_demo["productos"] if x["sku"] == "GRA-010")["mercado"]
     assert aceite["presentacion_objetivo"] == "1 L"
     # La garrafa de 5 L se lleva a la presentación del negocio (1 L) por su precio por unidad, y no entra en la mediana.
-    garrafa = next(a for a in aceite["anuncios"] if a["presentacion"] == "5 litros")
+    garrafa = next(a for a in aceite["anuncios_ref"] if a["presentacion"] == "5 litros")
     assert not garrafa["usado"] and round(garrafa["equivalente_usd"], 2) == round(17500 / 5 / aceite["tasa_usd_cup"], 2)
     pollo = next(x for x in panel_demo["productos"] if x["sku"] == "CAR-001")["mercado"]
-    anomalo = next(a for a in pollo["anuncios"] if a["precio"] == 95000)
+    anomalo = next(a for a in pollo["anuncios_ref"] if a["precio"] == 95000)
     assert anomalo["atipico"] == "ALTO" and not anomalo["usado"]
     h = renderizar(panel_demo, cfg["marca"])
     assert 'id="anuncios"' in h and "Anuncios de referencia" in h
+
+
+async def test_mercados_por_separado(tmp_path):
+    """Calle y tiendas online tienen cada uno su referencia; las propuestas usan la elegida en el perfil."""
+    from tests.conftest import cargar, crear_servicio
+
+    def panel_con(referencia: str, segmentos: dict):
+        cfg = cargar(tmp_path / referencia)
+        cfg.datos["mercado"]["segmentos"], cfg.datos["mercado"]["referencia"] = segmentos, referencia
+        return crear_servicio(cfg, tmp_path / referencia).panel()
+
+    segs = {"calle": {"nombre": "mercado de calle", "fuentes": ["prueba_clasificados"]},
+            "online": {"nombre": "tiendas online", "fuentes": ["prueba_tiendas"]}}
+    p = await panel_con("calle", segs)
+    assert p["meta"]["referencia_mercado"] == "mercado de calle"
+    pollo = next(x for x in p["productos"] if x["sku"] == "CAR-001")["mercado"]
+    calle, online = pollo["segmentos"]["calle"], pollo["segmentos"]["online"]
+    assert calle["referencia_usd"] and online["referencia_usd"] and calle["referencia_usd"] != online["referencia_usd"]
+    assert pollo["segmento"] == "calle" and pollo["referencia_usd"] == calle["referencia_usd"]
+    assert all(a["fuente"].startswith("Clasificados") for a in calle["anuncios_ref"])
+    assert all(a["fuente"].startswith("Tiendas online") for a in online["anuncios_ref"])
+    assert any("mercado de calle" in q["detalle"] for q in p["propuestas"])
+
+    p2 = await panel_con("online", segs)
+    pollo2 = next(x for x in p2["productos"] if x["sku"] == "CAR-001")["mercado"]
+    assert pollo2["segmento"] == "online" and pollo2["referencia_usd"] == online["referencia_usd"]
+
+    # Si el mercado preferido no tiene anuncios del producto, se usa el otro y se avisa.
+    p3 = await panel_con("calle", {**segs, "calle": {"nombre": "mercado de calle", "fuentes": ["no_existe"]}})
+    pollo3 = next(x for x in p3["productos"] if x["sku"] == "CAR-001")["mercado"]
+    assert pollo3["segmento"] == "online" and "Sin anuncios suficientes en mercado de calle" in pollo3["limitaciones"][0]

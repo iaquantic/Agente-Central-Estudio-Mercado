@@ -18,7 +18,7 @@ def test_bot_construye_y_programa(tmp_path):
     bot = BotTelegram(s, "123456:ABCDEF", (42,))
     assert bot.url_panel() == "https://p.ejemplo/panel?t=tk"
     bot.programar()
-    assert {j.name for j in bot.app.job_queue.jobs()} == {"resumen", "alertas", "panel"}
+    assert {"resumen", "alertas", "estudio"} <= {j.name for j in bot.app.job_queue.jobs()}
 
 
 async def test_bot_rechaza_desconocidos_y_grupos(servicio):
@@ -92,3 +92,41 @@ async def test_sin_claude_no_se_crea_el_orquestador_y_el_bot_lo_dice(tmp_path):
     upd = NS(effective_chat=NS(id=42), effective_user=NS(id=42))
     await bot._consultar(upd, "¿cómo va el aceite?")
     assert "desactivadas" in enviados[0] and "/panel" in enviados[0]
+
+
+async def test_un_estudio_por_dia(tmp_path):
+    """El panel se hace una vez al día (con mercado fresco) y se reutiliza, también tras reiniciar el servicio."""
+    from datetime import datetime
+
+    from agente_central.tiempo import Reloj
+
+    cfg = cargar(tmp_path / "datos")
+    zona = cfg.empresa["zona_horaria"]
+
+    def servicio_el(dia: str) -> tuple[Servicio, list]:
+        s = crear_servicio(cfg, tmp_path)
+        s.reloj_estudio = s.constructor.reloj_estudio = Reloj(zona, datetime.fromisoformat(dia))
+        llamadas = []
+        construir = s.constructor.construir
+
+        async def contar(**kw):
+            llamadas.append(kw)
+            return await construir(**kw)
+        s.constructor.construir = contar
+        return s, llamadas
+
+    s, llamadas = servicio_el("2026-10-07T09:00:00-04:00")
+    assert not s.panel_de_hoy()
+    p = await s.panel()
+    assert llamadas == [{"forzar_mercado": True}]
+    assert p["meta"]["estudio"] == "2026-10-07" and p["meta"]["generado"].startswith("2026-10-07T09:00")
+    assert p["meta"]["periodo"]["hasta"] == "2026-09-30"           # el negocio de prueba sigue en su fecha
+    assert await s.panel() is p and await s.panel_html() and len(llamadas) == 1 and s.panel_de_hoy()
+
+    s2, llamadas2 = servicio_el("2026-10-07T18:00:00-04:00")       # reinicio el mismo día: se reutiliza
+    assert s2.panel_de_hoy() and (await s2.panel())["meta"]["generado"] == p["meta"]["generado"] and not llamadas2
+
+    s3, llamadas3 = servicio_el("2026-10-08T07:30:00-04:00")       # día nuevo: estudio nuevo
+    assert (await s3.panel())["meta"]["estudio"] == "2026-10-08" and llamadas3 == [{"forzar_mercado": True}]
+    await s3.panel(forzar=True)                                    # actualizar a mano: mercado de la caché
+    assert llamadas3[-1] == {"forzar_mercado": False}

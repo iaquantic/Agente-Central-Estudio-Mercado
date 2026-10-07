@@ -175,10 +175,13 @@ class BotTelegram:
 
     async def _documento_panel(self, chat_id: int) -> None:
         """Envía el panel como archivo HTML autocontenido (se abre en el navegador del móvil, también sin conexión)."""
+        if not self.s.panel_de_hoy():
+            await self._enviar(chat_id, "⏳ Preparando el estudio de hoy (negocio + mercado). Tarda unos minutos; "
+                                        "después, el panel de hoy sale al momento.")
         await self.app.bot.send_chat_action(chat_id, ChatAction.UPLOAD_DOCUMENT)
         p = await self.s.panel()
         contenido = await self.s.panel_html()
-        nombre = f"panel_{self.s.cfg.empresa['id']}_{p['meta']['periodo']['hasta']}.html"
+        nombre = f"panel_{self.s.cfg.empresa['id']}_{p['meta'].get('estudio') or p['meta']['periodo']['hasta']}.html"
         url = self.url_panel()
         pie = f"\n\nTambién en: {html.escape(url)}" if url else ""
         await self.app.bot.send_document(chat_id, InputFile(io.BytesIO(contenido.encode("utf-8")), filename=nombre),
@@ -273,10 +276,11 @@ class BotTelegram:
             log.exception("Fallo de la revisión de alertas")
 
     async def _job_panel(self, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Hace el estudio del día si aún no está hecho (así el primer /panel de la mañana es inmediato)."""
         try:
-            await self.s.panel(forzar=True)
+            await self.s.panel()
         except Exception:
-            log.exception("Fallo al refrescar el panel")
+            log.exception("Fallo al hacer el estudio del día")
 
     def programar(self) -> None:
         tg, jq, zona = self.s.cfg["telegram"], self.app.job_queue, self.s.reloj.zona
@@ -284,4 +288,6 @@ class BotTelegram:
             jq.run_daily(self._job_resumen, time=_hora(tg["resumen_diario"]).replace(tzinfo=zona), name="resumen")
         if tg.get("alertas_urgentes"):
             jq.run_repeating(self._job_alertas, interval=int(tg["revisar_alertas_cada_min"]) * 60, first=60, name="alertas")
-        jq.run_repeating(self._job_panel, interval=int(self.s.cfg["panel"]["refresco_minutos"]) * 60, first=5, name="panel")
+        jq.run_daily(self._job_panel, time=_hora(self.s.cfg["panel"]["hora_estudio"]).replace(tzinfo=zona), name="estudio")
+        if self.s.reloj_estudio.ahora().time() >= _hora(self.s.cfg["panel"]["hora_estudio"]):
+            jq.run_once(self._job_panel, when=5, name="estudio_inicio")   # arranque tras la hora del estudio

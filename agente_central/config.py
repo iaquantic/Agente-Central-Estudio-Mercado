@@ -28,7 +28,7 @@ DEFECTOS: dict[str, Any] = {
                 "timeout_s": 30, "fixtures": "demo/interno/fixtures.json"},
     "mercado": {"modo": "motor", "fuentes": [], "provincias": [], "convertir_a": "USD", "granularidad": "week",
                 "dias_periodo": 7, "semanas_historial": 12, "cache_horas": 12},
-    "panel": {"meses_historial": 12, "top_n": 10, "refresco_minutos": 60, "titulo": "Panel de estudio de mercado"},
+    "panel": {"meses_historial": 12, "top_n": 10, "hora_estudio": "07:30", "titulo": "Panel de estudio de mercado"},
     "reglas": {"margen_minimo_pct": 10, "diferencia_precio_pct": 8, "variacion_tendencia_pct": 8,
                "cobertura_minima_dias": 7, "dias_horizonte": 30,
                "diferencia_maxima_fiable_pct": 50},

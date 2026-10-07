@@ -71,7 +71,7 @@ class Avisador:
         return f"🚨 <b>{html.escape(a['title'])}</b>\n{html.escape(a.get('detail') or '')}"
 
     async def resumen_diario(self, url_panel: str | None) -> str:
-        p = await self.s.panel(forzar=True)
+        p = await self.s.panel()
         t = (p.get("ventas_mes") or {}).get("totales") or {}
         c = ((p.get("ventas_mes") or {}).get("comparacion") or {}).get("delta_pct") or {}
         r = p.get("resumen") or {}

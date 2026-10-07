@@ -13,7 +13,7 @@ Mientras el Agente Interno no esté conectado a un negocio real, el Central usa 
 2. **Source** → GitHub:
    - Owner: `iaquantic`
    - Repository: `Agente-Central-Estudio-Mercado`
-   - Branch: `claude/nifty-ramanujan-u1p1sx` (o `main` cuando se fusione)
+   - Branch: `main`
    - Build path: `/`
 3. **Build** → **Dockerfile** (ruta `Dockerfile`). La imagen instala el Agente Externo desde su repositorio público.
 
@@ -24,6 +24,7 @@ EMPRESA_CONFIG=config/empresa.demo.yaml
 TELEGRAM_BOT_API=<token de @BotFather>
 TELEGRAM_USUARIOS=2002725655
 CLAUDE_ACTIVO=0
+ELTOQUE_API_KEY=<clave de elTOQUE>   # tasa del día para los importes en CUP
 # Cuando haya créditos de Anthropic:
 # ANTHROPIC_API_KEY=<clave sk-ant-…>
 # CLAUDE_ACTIVO=1
@@ -43,6 +44,10 @@ capturas de Revolico y Cuballama**, que es lo que permite calcular tendencias. U
 carpeta del host): el contenedor corre con un usuario sin privilegios y necesita poder escribir ahí.
 
 ## 4. Desplegar
+
+Desactiva el despliegue sin interrupción (*Zero Downtime*) del servicio: si el contenedor nuevo arranca antes de que
+se pare el anterior, los dos bots chocan unos segundos (`Conflict: terminated by other getUpdates request`).
+
 
 1. **Deploy**. La primera construcción tarda unos minutos.
 2. En **Logs** debe aparecer `Bot de Telegram en marcha (1 usuarios autorizados)`.

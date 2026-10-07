@@ -10,7 +10,8 @@ import json
 from datetime import datetime, time, timedelta
 from pathlib import Path
 
-from .formato import propuestas_html, usd
+from .formato import propuestas_html
+from .moneda import dinero_de_panel
 from .interno import datos
 
 
@@ -76,7 +77,13 @@ class Avisador:
         c = ((p.get("ventas_mes") or {}).get("comparacion") or {}).get("delta_pct") or {}
         r = p.get("resumen") or {}
         hoy = r.get("today") or {}
+        usd = dinero_de_panel(p)
         lineas = [f"📊 <b>Resumen de {html.escape(self.s.cfg.nombre)}</b> · <i>{p['meta']['periodo']['hasta']}</i>"]
+        td = p["meta"].get("tasa_dia") or {}
+        if td.get("usd_cup"):
+            dia = "/".join(reversed(str(td.get("fecha") or "")[:10].split("-")))
+            lineas.append(f"💱 1 USD = {td['usd_cup']:,.0f} CUP".replace(",", "\u202f")
+                          + f" ({html.escape(str(td.get('fuente') or ''))}" + (f", {dia})" if dia else ")"))
         if hoy:
             lineas.append(f"• Hoy: <b>{usd(hoy.get('net_usd'))}</b> en {hoy.get('tickets', 0)} ventas"
                           + (f" ({r['vs_expected_pct']:+.1f} % frente a lo esperado)".replace(".", ",") if r.get("vs_expected_pct") is not None else ""))
@@ -84,7 +91,7 @@ class Avisador:
             lineas.append(f"• Mes: <b>{usd(t.get('net_usd'), 0)}</b>"
                           + (f" ({c['net_usd']:+.1f} % frente al periodo anterior)".replace(".", ",") if c.get("net_usd") is not None else "")
                           + (f" · margen {str(t.get('gross_margin_pct')).replace('.', ',')} %" if t.get("gross_margin_pct") is not None else ""))
-        lineas.append("\n💡 <b>Decisiones propuestas</b>\n" + propuestas_html(p.get("propuestas", []), limite=4))
+        lineas.append("\n💡 <b>Decisiones propuestas</b>\n" + propuestas_html(p.get("propuestas", []), limite=4, dinero=usd))
         if url_panel:
             lineas.append(f"\nPanel completo: {html.escape(url_panel)}")
         return "\n".join(lineas)

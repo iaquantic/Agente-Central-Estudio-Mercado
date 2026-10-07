@@ -28,7 +28,7 @@ DEFECTOS: dict[str, Any] = {
                 "timeout_s": 30, "fixtures": "demo/interno/fixtures.json"},
     "mercado": {"modo": "motor", "fuentes": [], "provincias": [], "convertir_a": "USD", "granularidad": "week",
                 "dias_periodo": 7, "semanas_historial": 12, "cache_horas": 12},
-    "panel": {"meses_historial": 12, "top_n": 10, "hora_estudio": "07:30", "titulo": "Panel de estudio de mercado"},
+    "panel": {"meses_historial": 12, "top_n": 10, "hora_estudio": "07:30", "moneda_principal": "CUP", "titulo": "Panel de estudio de mercado"},
     "reglas": {"margen_minimo_pct": 10, "diferencia_precio_pct": 8, "variacion_tendencia_pct": 8,
                "cobertura_minima_dias": 7, "dias_horizonte": 30,
                "diferencia_maxima_fiable_pct": 50},
@@ -71,6 +71,7 @@ class Config:
     telegram_usuarios: tuple[int, ...] = ()
     token_interno: str | None = None
     panel_token: str | None = None
+    eltoque_api_key: str | None = None   # tasa USD→CUP del día (si falta, la del Agente Interno)
     panel_url_publica: str | None = None
     api_host: str = "127.0.0.1"
     api_port: int = 8090
@@ -124,6 +125,7 @@ class Config:
             telegram_usuarios=ids,
             token_interno=env.get(datos["interno"].get("token_env") or "ORQUESTADOR_TOKEN") or None,
             panel_token=env.get("PANEL_TOKEN") or None,
+            eltoque_api_key=env.get("ELTOQUE_API_KEY") or None,
             panel_url_publica=(env.get("PANEL_URL_PUBLICA") or "").rstrip("/") or None,
             api_host=env.get("API_HOST") or "127.0.0.1",
             api_port=int(env.get("API_PORT") or 8090),
@@ -144,6 +146,8 @@ class Config:
             raise ErrorConfig(f"interno.modo debe ser uno de {MODOS_INTERNO}")
         if d["mercado"]["modo"] not in MODOS_MERCADO:
             raise ErrorConfig(f"mercado.modo debe ser uno de {MODOS_MERCADO}")
+        if self.datos["panel"]["moneda_principal"] not in ("CUP", "USD"):
+            raise ErrorConfig("panel.moneda_principal debe ser CUP o USD")
         for f in d["mercado"]["fuentes"]:
             if f.get("tipo") == "web" and f.get("nombre") not in FUENTES_WEB:
                 raise ErrorConfig(f"Fuente web desconocida: {f.get('nombre')} (válidas: {', '.join(FUENTES_WEB)})")

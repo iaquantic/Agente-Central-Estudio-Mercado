@@ -19,6 +19,7 @@ from telegram.error import BadRequest
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
 from .formato import html_telegram, propuestas_html, texto_plano, trocear
+from .moneda import dinero_de_panel
 from .planificador import Avisador, _hora
 
 log = logging.getLogger(__name__)
@@ -191,7 +192,7 @@ class BotTelegram:
     async def _panel(self, chat_id: int) -> None:
         await self._documento_panel(chat_id)
         p = await self.s.panel()
-        await self._enviar(chat_id, "💡 <b>Decisiones propuestas</b>\n\n" + propuestas_html(p["propuestas"], limite=3))
+        await self._enviar(chat_id, "💡 <b>Decisiones propuestas</b>\n\n" + propuestas_html(p["propuestas"], limite=3, dinero=dinero_de_panel(p)))
 
     async def cmd_panel(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if await self._autorizado(update):
@@ -201,7 +202,7 @@ class BotTelegram:
 
     async def _oportunidades(self, chat_id: int) -> None:
         p = await self.s.panel()
-        await self._enviar(chat_id, "💡 <b>Decisiones propuestas</b>\n\n" + propuestas_html(p["propuestas"], limite=6))
+        await self._enviar(chat_id, "💡 <b>Decisiones propuestas</b>\n\n" + propuestas_html(p["propuestas"], limite=6, dinero=dinero_de_panel(p)))
 
     async def cmd_oportunidades(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if await self._autorizado(update):

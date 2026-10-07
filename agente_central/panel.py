@@ -14,6 +14,7 @@ from . import __version__
 from .cruce import PRIORIDADES, cruzar
 from .externo import ClienteMercado
 from .interno import Interno, datos, tasa
+from .moneda import TasaDia, formateador, fx_de
 from .tiempo import Reloj
 
 log = logging.getLogger(__name__)
@@ -35,12 +36,14 @@ def periodos(hoy: date, meses_historial: int = 12) -> dict[str, date]:
 
 
 class ConstructorPanel:
-    def __init__(self, cfg, interno: Interno, mercado: ClienteMercado, reloj: Reloj, reloj_estudio: Reloj | None = None):
+    def __init__(self, cfg, interno: Interno, mercado: ClienteMercado, reloj: Reloj, reloj_estudio: Reloj | None = None,
+                 tasa_dia: TasaDia | None = None):
         self.cfg = cfg
         self.interno = interno
         self.mercado = mercado
         self.reloj = reloj                              # negocio (congelado en el modo demo)
         self.reloj_estudio = reloj_estudio or reloj      # fecha real del estudio
+        self.tasa_dia = tasa_dia                         # tasa USD→CUP de hoy (elTOQUE)
 
     async def _h(self, nombre: str, params: dict, avisos: list[str]) -> dict | None:
         res = await self.interno.herramienta(nombre, params)
@@ -52,6 +55,7 @@ class ConstructorPanel:
 
     async def producto(self, sku: str, producto_mercado: dict, *, fx: dict | None, serie_fx: list | None,
                        avisos: list[str] | None = None, forzar: bool = False) -> dict | None:
+        """`fx` es la tasa con la que se convierten los precios de hoy (la del día de elTOQUE si está disponible)."""
         """Cruce completo de un producto (ficha + historial interno + análisis de mercado)."""
         avisos = [] if avisos is None else avisos
         p = periodos(self.reloj.hoy())
@@ -68,7 +72,8 @@ class ConstructorPanel:
             avisos.append(f"Agente Externo · {sku}: {type(e).__name__}")
             analisis = None
         return cruzar(ficha, (hist or {}).get("series") or [], analisis, fx=fx, serie_fx=serie_fx,
-                      reglas_cfg=self.cfg["reglas"], hoy=self.reloj.hoy())
+                      reglas_cfg=self.cfg["reglas"], hoy=self.reloj.hoy(),
+                      dinero=formateador((fx or {}).get("usd_cup"), self.cfg["panel"]["moneda_principal"]))
 
     async def construir(self, *, forzar_mercado: bool = False) -> dict[str, Any]:
         cfg, hoy = self.cfg, self.reloj.hoy()
@@ -93,6 +98,10 @@ class ConstructorPanel:
         )
         fx = (cambio or {}).get("today") or tasa(await self.interno.herramienta("get_data_quality", {}))
         serie_fx = (cambio or {}).get("series") or []
+        tasa_dia = await self.tasa_dia.obtener(fx) if self.tasa_dia else None
+        if tasa_dia and tasa_dia.get("aviso"):
+            avisos.append(tasa_dia["aviso"])
+        fx = fx_de(tasa_dia) or fx                       # los precios de hoy se convierten con la tasa de hoy
 
         productos = []
         for sku, prod in cfg.vigilados.items():          # en serie: las fuentes web se consultan con cortesía
@@ -110,6 +119,9 @@ class ConstructorPanel:
                 "titulo": cfg["panel"]["titulo"], "proveedor": cfg["marca"]["proveedor"],
                 "generado": self.reloj_estudio.ahora().isoformat(timespec="minutes"),
                 "estudio": self.reloj_estudio.hoy().isoformat(),
+                "tasa_dia": tasa_dia or (fx and {"usd_cup": fx.get("usd_cup"), "fecha": str(fx.get("date") or "")[:10],
+                                                 "fuente": fx.get("source")}),
+                "moneda_principal": cfg["panel"]["moneda_principal"],
                 "periodo": {"desde": mes["from"], "hasta": mes["to"]},
                 "demo": cfg["interno"]["modo"] == "demo",
                 "agente_central": __version__,

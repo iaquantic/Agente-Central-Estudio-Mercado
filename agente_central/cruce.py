@@ -14,7 +14,7 @@ from __future__ import annotations
 from bisect import bisect_right
 from datetime import date, datetime
 from statistics import mean
-from typing import Any
+from typing import Any, Callable
 
 PRIORIDADES = ("alta", "media", "baja", "info")
 ESTADOS_SIN_ROTACION = ("exceso", "sin_movimiento")
@@ -179,7 +179,7 @@ def metricas_internas(ficha: dict, semanas: list[dict], hoy: date) -> dict[str, 
 def _propuesta(tipo: str, prioridad: str, titulo: str, detalle: str, *, impacto: float | None = None,
                base_impacto: str | None = None, evidencia: dict | None = None) -> dict:
     return {"tipo": tipo, "prioridad": prioridad, "titulo": titulo, "detalle": detalle,
-            "impacto_usd": _r(impacto, 0) if impacto is not None else None, "base_impacto": base_impacto,
+            "impacto_usd": _r(impacto, 2) if impacto is not None else None, "base_impacto": base_impacto,
             "tipo_evidencia": "INFERENCIA", "evidencia": evidencia or {}}
 
 
@@ -189,15 +189,12 @@ ESTADO_TXT = {"agotado": "agotado", "riesgo_rotura": "en riesgo de rotura", "sto
 
 def _num(x: float, d: int) -> str:
     """Formato español: miles con espacio fino y coma decimal (1 234,50)."""
-    return f"{x:,.{d}f}".replace(",", " ").replace(".", ",")
+    return f"{x:,.{d}f}".replace(",", "\u202f").replace(".", ",")      # espacio fino que no se corta
 
 
-def _usd(x: float | None) -> str:
-    return "—" if x is None else _num(x, 2) + " USD"
-
-
-def _usd0(x: float | None) -> str:
-    return "—" if x is None else _num(x, 0) + " USD"
+def _usd(x: float | None, d: int = 2) -> str:
+    """Formato por defecto (solo USD), cuando no se indica la moneda principal ni la tasa."""
+    return "—" if x is None else _num(x, d) + " USD"
 
 
 def _p(x: float | None, signo: bool = False) -> str:
@@ -206,7 +203,8 @@ def _p(x: float | None, signo: bool = False) -> str:
     return ("+" if signo and x > 0 else "") + _num(x, 1) + " %"
 
 
-def reglas(interno: dict, mercado: dict, r: dict) -> list[dict]:
+def reglas(interno: dict, mercado: dict, r: dict, dinero: Callable[..., str] = _usd) -> list[dict]:
+    """`dinero(usd, d)` da formato a los importes de los textos (moneda principal y su equivalente)."""
     out: list[dict] = []
     ref = mercado.get("referencia_usd")
     precio, coste = interno.get("precio_usd"), interno.get("coste_medio_usd")
@@ -230,7 +228,7 @@ def reglas(interno: dict, mercado: dict, r: dict) -> list[dict]:
     # no se propone nada sobre esa base.
     if dif is not None and abs(dif) > r.get("diferencia_maxima_fiable_pct", 50):
         return [_propuesta("revisar_busqueda", "info", "Comparación con el mercado poco fiable",
-                           f"Tu precio ({_usd(precio)}) y la referencia del mercado ({_usd(ref)}) difieren un {_p(abs(dif))}: "
+                           f"Tu precio, {dinero(precio)}, y la referencia del mercado, {dinero(ref)}, difieren un {_p(abs(dif))}: "
                            f"seguramente la búsqueda mezcla otros productos o presentaciones ({mercado.get('n')} anuncios "
                            "comparables). Revisa la búsqueda de este producto en el perfil antes de decidir.",
                            evidencia=ev)]
@@ -241,7 +239,7 @@ def reglas(interno: dict, mercado: dict, r: dict) -> list[dict]:
         perdida = vel * (precio - coste) * h if precio is not None and coste is not None else None
         precio_txt = ""
         if dif is not None and dif <= -r["diferencia_precio_pct"]:
-            precio_txt = f" Al reponer, el mercado admite un precio cercano a {_usd(ref)} (vendes a {_usd(precio)})."
+            precio_txt = f" Al reponer, el mercado admite un precio cercano a {dinero(ref)}; ahora vendes a {dinero(precio)}."
         if escaso:
             out.append(_propuesta(
                 "reponer", "alta", "Reponer ya: el mercado está escaso",
@@ -264,11 +262,11 @@ def reglas(interno: dict, mercado: dict, r: dict) -> list[dict]:
         out.append(_propuesta(
             "subir_precio", "alta" if comprimido else "media",
             "Margen comprimido: el mercado ya subió" if comprimido and sube else "Hay margen para subir el precio",
-            f"Vendes a {_usd(precio)}, un {_p(abs(dif))} por debajo de la mediana del mercado ({_usd(ref)})"
+            f"Vendes a {dinero(precio)}, un {_p(abs(dif))} por debajo de la mediana del mercado, que está en {dinero(ref)}"
             + (f"; tu margen es del {_p(margen)}" if margen is not None else "")
             + (f" y el mercado ha subido un {_p(var)}" if sube else "")
-            + f". Un precio de {_usd(objetivo)} te mantendría por debajo del mercado.",
-            impacto=extra, base_impacto=f"margen adicional en {h} días a {_usd(objetivo)} con las mismas ventas ({_num(vel, 1)} u/día)",
+            + f". Un precio de {dinero(objetivo)} te mantendría por debajo del mercado.",
+            impacto=extra, base_impacto=f"margen adicional en {h} días a {dinero(objetivo)} con las mismas ventas ({_num(vel, 1)} u/día)",
             evidencia={**ev, "precio_propuesto_usd": objetivo}))
     elif margen is not None and margen < r["margen_minimo_pct"] and dif is not None and dif > -r["diferencia_precio_pct"]:
         out.append(_propuesta(
@@ -283,8 +281,8 @@ def reglas(interno: dict, mercado: dict, r: dict) -> list[dict]:
         out.append(_propuesta(
             "bajar_precio", "alta" if no_rota else "media",
             "Precio por encima del mercado" + (" y el producto no rota" if no_rota else ""),
-            f"Vendes a {_usd(precio)}, un {_p(dif)} por encima de la mediana del mercado ({_usd(ref)})."
-            + (f" Tienes {interno.get('stock')} u paradas ({_usd0(interno.get('valor_stock_usd'))} a coste)."
+            f"Vendes a {dinero(precio)}, un {_p(dif)} por encima de la mediana del mercado, que está en {dinero(ref)}."
+            + (f" Tienes {interno.get('stock')} u paradas, que valen {dinero(interno.get('valor_stock_usd'), 0)} a coste."
                if no_rota else (f" Además, el mercado baja un {_p(abs(var))}." if baja else " Vigila si las ventas empiezan a caer.")),
             impacto=interno.get("valor_stock_usd") if no_rota else None,
             base_impacto="valor a coste del stock que se liberaría" if no_rota else None, evidencia=ev))
@@ -324,7 +322,7 @@ def reglas(interno: dict, mercado: dict, r: dict) -> list[dict]:
 
 
 def cruzar(ficha: dict, semanas: list[dict], analisis: dict | None, *, fx: dict | None, serie_fx: list[dict] | None,
-           reglas_cfg: dict, hoy: date) -> dict[str, Any]:
+           reglas_cfg: dict, hoy: date, dinero: Callable[..., str] = _usd) -> dict[str, Any]:
     """Resultado completo del cruce para un producto."""
     interno = metricas_internas(ficha, semanas, hoy)
     base = {"sku": ficha.get("sku"), "nombre": ficha.get("name"), "categoria": ficha.get("category"), "interno": interno}
@@ -356,6 +354,6 @@ def cruzar(ficha: dict, semanas: list[dict], analisis: dict | None, *, fx: dict 
     posicion = None if dif is None else {
         "diferencia_pct": dif,
         "etiqueta": "por_debajo" if dif <= -umbral else "por_encima" if dif >= umbral else "en_linea"}
-    propuestas = reglas(interno, mercado, reglas_cfg)
+    propuestas = reglas(interno, mercado, reglas_cfg, dinero)
     propuestas.sort(key=lambda p: (PRIORIDADES.index(p["prioridad"]), -(p["impacto_usd"] or 0)))
     return {**base, "estado": "ok", "mercado": mercado, "posicion": posicion, "propuestas": propuestas}

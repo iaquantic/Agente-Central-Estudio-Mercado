@@ -80,7 +80,7 @@ def test_reponer_con_mercado_escaso_es_prioridad_alta():
     p = reglas(_interno(estado_stock="agotado", stock=0, precio_usd=3.8, coste_medio_usd=3.07, velocidad_con_stock=5),
                _mercado(5.0, var=23.6, señales=["POSSIBLE_SHORTAGE"]), REGLAS)
     assert _tipos(p)[0] == ("reponer", "alta")
-    assert p[0]["impacto_usd"] == round(5 * (3.8 - 3.07) * 30)
+    assert p[0]["impacto_usd"] == round(5 * (3.8 - 3.07) * 30, 2)
     assert "5,00 USD" in p[0]["detalle"]                     # sugiere reponer más cerca del precio de mercado
 
 

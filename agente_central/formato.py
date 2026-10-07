@@ -67,13 +67,13 @@ def usd(v: float | None, d: int = 2) -> str:
 EMOJI_PRIORIDAD = {"alta": "🔴", "media": "🟠", "baja": "🟡", "info": "⚪"}
 
 
-def propuestas_html(propuestas: list[dict], limite: int = 5) -> str:
+def propuestas_html(propuestas: list[dict], limite: int = 5, dinero=None) -> str:
     """Lista de propuestas en HTML de Telegram (sin modelo: para el resumen diario y /oportunidades)."""
     if not propuestas:
         return "No hay decisiones pendientes para los productos vigilados."
     lineas = []
     for p in propuestas[:limite]:
-        imp = f" · <i>≈ {usd(p['impacto_usd'], 0)}</i>" if p.get("impacto_usd") else ""
+        imp = f" · <i>≈ {(dinero or usd)(p['impacto_usd'], 0)}</i>" if p.get("impacto_usd") else ""
         lineas.append(f"{EMOJI_PRIORIDAD.get(p['prioridad'], '•')} <b>{html.escape(p['nombre'])}</b>: "
                       f"{html.escape(p['titulo'])}{imp}\n{html.escape(p['detalle'])}")
     if len(propuestas) > limite:

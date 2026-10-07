@@ -92,7 +92,9 @@ main { margin-top: -52px; padding-bottom: 48px; display: grid; gap: 20px; }
 .kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); }
 .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; min-width: 0; }
 .kpi .etq { font-size: 13px; color: var(--fg-2); }
-.kpi .valor { font: 600 26px/1.15 var(--font-titulos); margin-top: 6px; overflow-wrap: anywhere; }
+.kpi .valor { font: 600 26px/1.15 var(--font-titulos); margin-top: 6px; overflow-wrap: break-word; }
+.eq { font: 400 .78em/1.2 var(--font-texto, inherit); color: var(--muted); white-space: nowrap; }
+.kpi .valor .eq, .propuesta .impacto b .eq { display: block; font-size: 13px; margin-top: 2px; }
 .kpi .delta { font-size: 12.5px; margin-top: 4px; color: var(--muted); }
 .sube-bien { color: var(--bien-texto); } .baja-mal { color: var(--mal-texto); }
 
@@ -229,7 +231,7 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
 
   <section class="tarjeta" aria-labelledby="t-tendencias">
     <header><div><div class="eyebrow">Mercado</div><h2 id="t-tendencias">Tendencia de precios en el mercado</h2></div>
-      <div class="leyenda"><span><i class="k-linea-m"></i>Mediana semanal del mercado (USD equiv.)</span><span><i class="k-linea-n"></i>Tu precio actual</span></div></header>
+      <div class="leyenda"><span><i class="k-linea-m"></i>Mediana semanal del mercado</span><span><i class="k-linea-n"></i>Tu precio actual</span></div></header>
     <div class="multiples" id="tendencias"></div>
     <p class="nota" id="nota-tendencias"></p>
   </section>
@@ -275,10 +277,24 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
   const D = JSON.parse(document.getElementById("datos-panel").textContent);
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
-  const nf0 = new Intl.NumberFormat("es-ES", {maximumFractionDigits: 0, useGrouping: "always"});
-  const nf1 = new Intl.NumberFormat("es-ES", {minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: "always"});
-  const nf2 = new Intl.NumberFormat("es-ES", {minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: "always"});
-  const usd = (v, d = 0) => v == null ? "—" : (d ? nf2 : nf0).format(v) + " USD";
+  // Miles con espacio fino que no se corta (12 099 218), como en los textos del bot.
+  const fmt = (o) => { const f = new Intl.NumberFormat("es-ES", {...o, useGrouping: "always"}); return {format: (v) => f.format(v).replace(/\./g, "\u202f")}; };
+  const nf0 = fmt({maximumFractionDigits: 0});
+  const nf1 = fmt({minimumFractionDigits: 1, maximumFractionDigits: 1});
+  const nf2 = fmt({minimumFractionDigits: 2, maximumFractionDigits: 2});
+  // Importes: los subagentes trabajan en USD; se muestran en la moneda principal (CUP a la tasa de hoy) y,
+  // al lado, su equivalente. usd() devuelve HTML; usdTxt(), texto plano (etiquetas de accesibilidad, textContent).
+  const TASA_DIA = (D.meta && D.meta.tasa_dia) || null, TASA = TASA_DIA && TASA_DIA.usd_cup;
+  const EN_CUP = !!TASA && ((D.meta && D.meta.moneda_principal) || "CUP") === "CUP";
+  const K = EN_CUP ? TASA : 1;                       // escala de las gráficas (USD → moneda principal)
+  const soloUsd = (v, d = 0) => (d ? nf2 : nf0).format(v) + " USD";
+  const soloCup = (v) => nf0.format(v * TASA) + " CUP";
+  const usdTxt = (v, d = 0) => v == null ? "—" : !TASA ? soloUsd(v, d) : EN_CUP ? `${soloCup(v)} (${soloUsd(v, d)})` : `${soloUsd(v, d)} (${soloCup(v)})`;
+  const usd = (v, d = 0) => v == null ? "—" : !TASA ? soloUsd(v, d) : EN_CUP ? `${soloCup(v)} <span class=eq>(${soloUsd(v, d)})</span>` : `${soloUsd(v, d)} <span class=eq>(${soloCup(v)})</span>`;
+  // Tarjetas de indicadores: millones abreviados en la moneda principal (77,5 M CUP) para que quepan.
+  const kpiUsd = (v, d = 0) => v == null || !EN_CUP || Math.abs(v * TASA) < 1e6 ? usd(v, d)
+    : `${nf1.format(v * TASA / 1e6)} M CUP <span class=eq>(${soloUsd(v, d)})</span>`;
+  const eje = (v) => EN_CUP ? nf0.format(v) : nf2.format(v);
   const compacto = (v) => v == null ? "—" : Math.abs(v) >= 1e6 ? nf1.format(v / 1e6) + " M" : Math.abs(v) >= 1e4 ? nf1.format(v / 1e3) + " k" : nf0.format(v);
   const pct = (v, signo = true) => v == null ? "—" : (signo && v > 0 ? "+" : "") + nf1.format(v) + " %";
   const TZ = (D.meta && D.meta.zona_horaria) || undefined;
@@ -325,7 +341,8 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
     M.demo ? '<span class="pastilla demo">Negocio de demostración · mercado en vivo</span>' : "",
     `<span class="pastilla">${M.demo ? "Negocio (datos de prueba)" : "Periodo"}: ${fecha(M.periodo.desde)} – ${fecha(M.periodo.hasta)}</span>`,
     M.estudio ? `<span class="pastilla">Estudio de mercado del ${fecha(M.estudio)}</span>` : "",
-    fx ? `<span class="pastilla">1 USD = ${nf2.format(fx.usd_cup)} CUP · ${esc(fx.source)}</span>` : "",
+    TASA ? `<span class="pastilla">1 USD = ${nf2.format(TASA)} CUP · ${esc(TASA_DIA.fuente || "")}${TASA_DIA.fecha ? " · " + fecha(TASA_DIA.fecha) : ""}</span>`
+         : fx ? `<span class="pastilla">1 USD = ${nf2.format(fx.usd_cup)} CUP · ${esc(fx.source)}</span>` : "",
     `<span class="pastilla">Actualizado ${fechaHora(M.generado)}</span>`
   ].join("");
   $("subtitulo").textContent = M.empresa.descripcion || "";
@@ -337,15 +354,15 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
     const delta = (v, txt, bueno = 1) => v == null ? `<div class="delta">${txt}</div>` :
       `<div class="delta"><span class="${v * bueno >= 0 ? "sube-bien" : "baja-mal"}">${v > 0 ? "▲" : v < 0 ? "▼" : ""} ${pct(v)}</span> ${txt}</div>`;
     const items = [
-      ["Ventas netas del mes", usd(t.net_usd), delta(c.net_usd, "vs. periodo anterior")],
+      ["Ventas netas del mes", kpiUsd(t.net_usd), delta(c.net_usd, "vs. periodo anterior")],
       ["Margen bruto", t.gross_margin_pct == null ? "—" : nf1.format(t.gross_margin_pct) + " %", (() => {
         const ant = ((vm.comparacion || {}).totales || (vm.comparacion || {}).totals || {}).gross_margin_pct, dm = ant == null || t.gross_margin_pct == null ? null : t.gross_margin_pct - ant;
         return dm == null ? `<div class="delta">${usd(t.gross_profit_usd)} de beneficio bruto</div>` :
           `<div class="delta"><span class="${dm >= 0 ? "sube-bien" : "baja-mal"}">${dm > 0 ? "▲" : dm < 0 ? "▼" : ""} ${dm > 0 ? "+" : ""}${nf1.format(dm)} pp</span> vs. periodo anterior</div>`; })()],
-      ["Ticket medio", usd(t.avg_ticket_usd, 2), delta(c.avg_ticket_usd, "vs. periodo anterior")],
-      ["Ventas de hoy", usd((r.today || {}).net_usd), delta(r.vs_expected_pct, `vs. lo esperado a las ${esc(r.as_of_hour || "")}`)],
+      ["Ticket medio", kpiUsd(t.avg_ticket_usd, 2), delta(c.avg_ticket_usd, "vs. periodo anterior")],
+      ["Ventas de hoy", kpiUsd((r.today || {}).net_usd), delta(r.vs_expected_pct, `vs. lo esperado a las ${esc(r.as_of_hour || "")}`)],
       ["Alertas urgentes", nf0.format(al.urgent || 0), `<div class="delta">${nf0.format(al.high || 0)} de prioridad alta</div>`],
-      ["Dinero inmovilizado", usd(inv.immobilized_value_usd), `<div class="delta">exceso y sin movimiento, a coste</div>`],
+      ["Dinero inmovilizado", kpiUsd(inv.immobilized_value_usd), `<div class="delta">exceso y sin movimiento, a coste</div>`],
     ];
     $("kpis").innerHTML = items.map(([e, v, d]) => `<div class="kpi"><div class="etq">${e}</div><div class="valor">${v}</div>${d}</div>`).join("");
   })();
@@ -412,7 +429,7 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
       caja.innerHTML = `<div class="cab"><h3>${esc(p.nombre)}</h3><span class="var">${v == null ? "—" : (v > 0 ? "▲ " : v < 0 ? "▼ " : "") + pct(v)}</span></div>`;
       cont.appendChild(caja);
       const W = Math.max(200, caja.clientWidth - 28), H = 92, pad = {l: 4, r: 40, t: 8, b: 6};
-      const vals = serie.map((s) => s.usd).concat(precio != null ? [precio] : []);
+      const vals = serie.map((s) => s.usd * K).concat(precio != null ? [precio * K] : []);
       if (serie.length < 2) {
         const ref = m.referencia_usd;
         caja.insertAdjacentHTML("beforeend", `<p class="nota">Mediana actual: <b>${usd(ref, 2)}</b> · tu precio ${usd(precio, 2)}.<br>La tendencia aparece cuando haya capturas de varias semanas (se guarda una en cada análisis).</p>`);
@@ -421,21 +438,21 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
       let lo = Math.min(...vals), hi = Math.max(...vals); const mg = (hi - lo) * 0.15 || hi * 0.05; lo -= mg; hi += mg;
       const X = (i) => pad.l + i * (W - pad.l - pad.r) / (serie.length - 1), Y = (val) => pad.t + (hi - val) / (hi - lo) * (H - pad.t - pad.b);
       const s = svg(W, H); s.setAttribute("data-tip-zona", "");
-      s.setAttribute("role", "img"); s.setAttribute("aria-label", `${p.nombre}: mercado de ${usd(serie[0].usd, 2)} a ${usd(serie[serie.length - 1].usd, 2)}`);
-      const pts = serie.map((d, i) => `${X(i).toFixed(1)},${Y(d.usd).toFixed(1)}`);
+      s.setAttribute("role", "img"); s.setAttribute("aria-label", `${p.nombre}: mercado de ${usdTxt(serie[0].usd, 2)} a ${usdTxt(serie[serie.length - 1].usd, 2)}`);
+      const pts = serie.map((d, i) => `${X(i).toFixed(1)},${Y(d.usd * K).toFixed(1)}`);
       el("path", {d: `M${pts[0]} L${pts.slice(1).join(" L")} L${X(serie.length - 1)},${H - pad.b} L${X(0)},${H - pad.b} Z`, fill: "var(--serie-mercado)", "fill-opacity": 0.10, stroke: "none"}, s);
-      if (precio != null) el("line", {x1: pad.l, x2: W - pad.r, y1: Y(precio), y2: Y(precio), stroke: "var(--serie-negocio)", "stroke-width": 2, "stroke-linecap": "round"}, s);
+      if (precio != null) el("line", {x1: pad.l, x2: W - pad.r, y1: Y(precio * K), y2: Y(precio * K), stroke: "var(--serie-negocio)", "stroke-width": 2, "stroke-linecap": "round"}, s);
       el("path", {d: `M${pts.join(" L")}`, fill: "none", stroke: "var(--serie-mercado)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round"}, s);
       const ult = serie[serie.length - 1];
-      el("circle", {cx: X(serie.length - 1), cy: Y(ult.usd), r: 4, fill: "var(--serie-mercado)", stroke: "var(--surface)", "stroke-width": 2}, s);
-      texto(nf2.format(ult.usd), {x: W - pad.r + 8, y: Y(ult.usd) + 4, fill: "var(--fg-2)"}, s);
-      if (precio != null && Math.abs(Y(precio) - Y(ult.usd)) > 12) texto(nf2.format(precio), {x: W - pad.r + 8, y: Y(precio) + 4, fill: "var(--fg-2)"}, s);
+      el("circle", {cx: X(serie.length - 1), cy: Y(ult.usd * K), r: 4, fill: "var(--serie-mercado)", stroke: "var(--surface)", "stroke-width": 2}, s);
+      texto(eje(ult.usd * K), {x: W - pad.r + 8, y: Y(ult.usd * K) + 4, fill: "var(--fg-2)"}, s);
+      if (precio != null && Math.abs(Y(precio * K) - Y(ult.usd * K)) > 12) texto(eje(precio * K), {x: W - pad.r + 8, y: Y(precio * K) + 4, fill: "var(--fg-2)"}, s);
       const guia = el("line", {y1: pad.t, y2: H - pad.b, stroke: "var(--axis)", "stroke-width": 1, visibility: "hidden"}, s);
       const marca = el("circle", {r: 4, fill: "var(--serie-mercado)", stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden"}, s);
       el("rect", {x: 0, y: 0, width: W, height: H, fill: "transparent"}, s).addEventListener("pointermove", (e) => {
         const r = s.getBoundingClientRect(), i = Math.max(0, Math.min(serie.length - 1, Math.round((e.clientX - r.left - pad.l) / ((W - pad.l - pad.r) / (serie.length - 1)))));
         guia.setAttribute("x1", X(i)); guia.setAttribute("x2", X(i)); guia.setAttribute("visibility", "visible");
-        marca.setAttribute("cx", X(i)); marca.setAttribute("cy", Y(serie[i].usd)); marca.setAttribute("visibility", "visible");
+        marca.setAttribute("cx", X(i)); marca.setAttribute("cy", Y(serie[i].usd * K)); marca.setAttribute("visibility", "visible");
         mostrarTip(`Semana del ${fecha(serie[i].semana)}<br>Mercado: ${usd(serie[i].usd, 2)}${serie[i].anuncios != null ? ` · ${serie[i].anuncios} anuncios` : ""}<br>Tu precio hoy: ${usd(precio, 2)}`, e.clientX, e.clientY);
       });
       s.addEventListener("pointerleave", () => { guia.setAttribute("visibility", "hidden"); marca.setAttribute("visibility", "hidden"); ocultarTip(); });
@@ -443,7 +460,7 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
       const tc = m.tendencia_controlador;
       caja.insertAdjacentHTML("beforeend", `<div class="pie"><span>${fecha(serie[0].semana)} – ${fecha(ult.semana)}</span><span>${tc ? esc(tc.classification.replace(/_/g, " ").toLowerCase()) : ""} · conf. ${esc(m.confianza)}</span></div>`);
     });
-    $("nota-tendencias").textContent = "Mediana semanal de los anuncios comparables. Los precios en CUP se convierten a USD con la tasa informal de cada semana (estimación), para separar el movimiento del producto del de la tasa.";
+    $("nota-tendencias").textContent = "Mediana semanal de los anuncios comparables. Los precios en CUP se pasan a USD con la tasa informal de cada semana (estimación), para separar el movimiento del producto del de la tasa" + (EN_CUP ? "; después se expresan en CUP a la tasa de hoy." : ".");
   }
 
   // Ventas mensuales -------------------------------------------------------------------------
@@ -451,23 +468,23 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
     const cont = $("ventas-mensuales"); cont.innerHTML = "";
     const g = D.ventas_mensuales || []; if (!g.length) { cont.innerHTML = '<p class="nota">Sin datos.</p>'; return; }
     const W = Math.max(300, cont.clientWidth), H = 240, pad = {l: 56, r: 8, t: 12, b: 28};
-    const max = Math.max(...g.map((x) => x.net_usd)), ticks = limpios(0, max), top = ticks[ticks.length - 1];
+    const max = Math.max(...g.map((x) => x.net_usd * K)), ticks = limpios(0, max), top = ticks[ticks.length - 1];
     const s = svg(W, H), bw = (W - pad.l - pad.r) / g.length, ancho = Math.min(24, bw * 0.6);
     const Y = (v) => pad.t + (top - v) / top * (H - pad.t - pad.b);
     ticks.forEach((t) => { el("line", {x1: pad.l, x2: W - pad.r, y1: Y(t), y2: Y(t), stroke: t === 0 ? "var(--axis)" : "var(--grid)", "stroke-width": 1}, s); texto(compacto(t), {x: pad.l - 8, y: Y(t) + 4, "text-anchor": "end"}, s); });
     const mx = g.reduce((a, b) => b.net_usd > a.net_usd ? b : a);
     g.forEach((x, i) => {
-      const cx = pad.l + bw * i + bw / 2, y = Y(x.net_usd), h = H - pad.b - y, r = Math.min(4, h);
+      const cx = pad.l + bw * i + bw / 2, y = Y(x.net_usd * K), h = H - pad.b - y, r = Math.min(4, h);
       const ultimo = i === g.length - 1;
       const p = el("path", {d: `M${cx - ancho / 2},${H - pad.b} V${y + r} Q${cx - ancho / 2},${y} ${cx - ancho / 2 + r},${y} H${cx + ancho / 2 - r} Q${cx + ancho / 2},${y} ${cx + ancho / 2},${y + r} V${H - pad.b} Z`,
         fill: "var(--serie-negocio)", "fill-opacity": ultimo ? 1 : 0.55, tabindex: 0}, s);
       const [a, m] = x.key.split("-");
       p.setAttribute("data-tip", `<b>${MESES[+m - 1]} ${a}</b>${ultimo ? " (en curso)" : ""}<br>Ventas netas: ${usd(x.net_usd)}<br>Margen: ${nf1.format(x.gross_margin_pct)} % · ${nf0.format(x.tickets)} ventas`);
       if (g.length <= 12 || i % 2 === 0) texto(MESES[+m - 1], {x: cx, y: H - 8, "text-anchor": "middle"}, s);
-      if (x === mx || ultimo) texto(compacto(x.net_usd), {x: cx, y: y - 6, "text-anchor": "middle", fill: "var(--fg-2)"}, s);
+      if (x === mx || ultimo) texto(compacto(x.net_usd * K), {x: cx, y: y - 6, "text-anchor": "middle", fill: "var(--fg-2)"}, s);
     });
     cont.appendChild(s);
-    $("nota-ventas").textContent = "USD, últimos 12 meses; el mes en curso, resaltado";
+    $("nota-ventas").textContent = (EN_CUP ? "CUP a la tasa de hoy" : "USD") + ", últimos 12 meses; el mes en curso, resaltado";
     $("tabla-ventas").innerHTML = `<table><thead><tr><th>Mes</th><th class="num">Ventas netas</th><th class="num">Beneficio bruto</th><th class="num">Margen</th><th class="num">Ventas</th></tr></thead><tbody>${
       g.map((x) => `<tr><td>${x.key}</td><td class="num">${usd(x.net_usd)}</td><td class="num">${usd(x.gross_profit_usd)}</td><td class="num">${nf1.format(x.gross_margin_pct)} %</td><td class="num">${nf0.format(x.tickets)}</td></tr>`).join("")}</tbody></table>`;
   }
@@ -537,7 +554,7 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
   (function inventario() {
     const inv = D.inventario || {}, t = inv.totals || {}, por = t.by_status || {};
     $("estados").innerHTML = Object.keys(ESTADO).map((k) => chip(ESTADO[k][0] === "info" ? k : ESTADO[k][0], `${ESTADO[k][1]}: ${por[k] || 0}`, ESTADO[k][0])).join("");
-    $("nota-inv").textContent = `${usd(t.immobilized_value_usd)} inmovilizados de ${usd(t.total_stock_value_usd)} en stock`;
+    $("nota-inv").textContent = `${usdTxt(t.immobilized_value_usd)} inmovilizados de ${usdTxt(t.total_stock_value_usd)} en stock`;
     const items = (inv.items || []).slice(0, 12);
     $("inventario").innerHTML = `<table><thead><tr><th>Producto</th><th>Estado</th><th class="num">Stock</th><th class="num">Cobertura</th><th class="num">Valor</th></tr></thead><tbody>${
       items.map((i) => `<tr><td>${esc(i.name)}</td><td>${esc((ESTADO[i.status] || [0, i.status])[1])}</td><td class="num">${nf0.format(i.stock)}</td><td class="num">${i.coverage_days == null ? "—" : nf0.format(i.coverage_days) + " d"}</td><td class="num">${usd(i.stock_value_usd)}</td></tr>`).join("")}</tbody></table>`;
@@ -564,7 +581,7 @@ footer.pie-pagina { color: var(--muted); font-size: 12.5px; padding-block: 8px 3
         <li>Descuadres de stock: ${q.stock_mismatch_count ?? "—"}</li></ul></div>
       <div><h3>Mercado (Agente Externo)</h3><ul><li>Fuentes: ${esc((M.fuentes_mercado || []).join(", ") || "—")}</li>${conf}</ul></div>
       <div><h3>Límites del análisis</h3><ul>${[...lim].slice(0, 4).map((l) => `<li>${esc(l)}</li>`).join("")}
-        <li>Las conversiones CUP↔USD usan la tasa informal de elTOQUE: son estimaciones.</li></ul>
+        <li>Las conversiones CUP↔USD usan la tasa informal de elTOQUE: son estimaciones.${EN_CUP ? ` Los importes se muestran en CUP a la tasa de hoy (1 USD = ${nf2.format(TASA)} CUP) y, entre paréntesis, en USD, la moneda en la que los registra el negocio.` : ""}</li></ul>
         ${(c.avisos || []).length ? `<h3>Avisos</h3><ul>${c.avisos.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}</div>`;
     $("pie").textContent = `${M.proveedor} · Agente Central ${M.agente_central} · Generado ${fechaHora(M.generado)} (${TZ || "hora local"})` + (M.demo ? " · Negocio de demostración (MercadoMVP); los precios de mercado son reales, capturados en vivo de las fuentes indicadas." : "");
   })();

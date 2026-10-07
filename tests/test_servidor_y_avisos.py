@@ -48,7 +48,8 @@ async def test_resumen_diario(tmp_path):
     s = _servicio(tmp_path)
     texto = await Avisador(s, tmp_path / "e.json").resumen_diario("https://panel/x")
     assert "Resumen de MercadoAgentico" in texto and "Decisiones propuestas" in texto and "https://panel/x" in texto
-    assert "100 706 USD" in texto
+    plano = texto.replace("\u202f", " ").replace("\u00a0", " ")
+    assert "1 USD = 742 CUP" in plano and "CUP (100 706 USD)" in plano      # importes en CUP con su valor en USD
 
 
 def test_formato_telegram():

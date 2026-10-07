@@ -19,7 +19,8 @@ from .tiempo import Reloj
 
 log = logging.getLogger(__name__)
 API_ELTOQUE = "https://tasas.eltoque.com/v1/trmi"
-REINTENTO_S = 3600            # si elTOQUE falla, se reintenta como mucho una vez por hora
+REINTENTO_S = 15 * 60         # si elTOQUE falla, se reintenta como mucho cada 15 min
+VIGENCIA_S = 3600             # la tasa se renueva cada hora (la web de elTOQUE la actualiza durante el día)
 
 Dinero = Callable[..., str]
 
@@ -81,7 +82,8 @@ async def tasa_eltoque(reloj: Reloj, clave: str, cliente: httpx.AsyncClient | No
 
 
 class TasaDia:
-    """Tasa del día: de elTOQUE (ELTOQUE_API_KEY) una vez al día, guardada en disco; si no, la del Agente Interno."""
+    """Tasa USD→CUP de elTOQUE (ELTOQUE_API_KEY), guardada en disco y renovada cada hora; si no hay clave o la API
+    no responde, la última del día y, si no, la del Agente Interno (con aviso)."""
 
     def __init__(self, reloj: Reloj, archivo: Path, clave: str | None = None, cliente: httpx.AsyncClient | None = None):
         self.reloj = reloj
@@ -91,28 +93,38 @@ class TasaDia:
         self._ultimo_fallo: datetime | None = None
 
     def _guardada(self) -> dict | None:
+        """La guardada hoy (o None)."""
         try:
             t = json.loads(self.archivo.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return None
         return t if t.get("dia") == self.reloj.hoy().isoformat() else None
 
+    def _vigente(self, t: dict) -> bool:
+        try:
+            return (self.reloj.ahora() - datetime.fromisoformat(t["obtenida"])).total_seconds() < VIGENCIA_S
+        except (KeyError, TypeError, ValueError):
+            return False
+
     async def obtener(self, respaldo: dict | None = None) -> dict | None:
         """`respaldo`: tasa del Agente Interno ({date, usd_cup, source}) para cuando elTOQUE no esté disponible."""
-        t = self._guardada()
-        if t:
-            return t
+        guardada = self._guardada()
+        if guardada and self._vigente(guardada):
+            return guardada
         ahora = self.reloj.ahora()
         if self.clave and (self._ultimo_fallo is None or (ahora - self._ultimo_fallo).total_seconds() > REINTENTO_S):
             t = await tasa_eltoque(self.reloj, self.clave, self.cliente)
             if t:
-                t["dia"] = self.reloj.hoy().isoformat()
+                t.update(dia=self.reloj.hoy().isoformat(), obtenida=ahora.isoformat(timespec="seconds"))
                 self.archivo.parent.mkdir(parents=True, exist_ok=True)
                 self.archivo.write_text(json.dumps(t, ensure_ascii=False), encoding="utf-8")
                 return t
             self._ultimo_fallo = ahora
+        if guardada:                                       # elTOQUE no responde ahora: la última de hoy
+            return guardada
         if respaldo and respaldo.get("usd_cup"):
             return {"usd_cup": float(respaldo["usd_cup"]), "fecha": str(respaldo.get("date") or "")[:10], "hora": None,
                     "fuente": f"{respaldo.get('source') or 'elTOQUE'} (vía Agente Interno)",
-                    "aviso": None if self.clave else "Falta ELTOQUE_API_KEY: se usa la última tasa del Agente Interno."}
+                    "aviso": ("Falta ELTOQUE_API_KEY: se usa la última tasa del Agente Interno." if not self.clave
+                              else "elTOQUE no responde: se usa la última tasa del Agente Interno.")}
         return None

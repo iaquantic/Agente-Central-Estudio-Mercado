@@ -51,7 +51,8 @@ class Servicio:
         if self._orquestador is None:
             from .herramientas import Ejecutor
             from .orquestador import Orquestador
-            self._orquestador = Orquestador(self.cfg, Ejecutor(self), self.reloj, cliente=self._cliente_claude)
+            self._orquestador = Orquestador(self.cfg, Ejecutor(self), self.reloj, cliente=self._cliente_claude,
+                                            reloj_real=self.reloj_estudio)
         return self._orquestador
 
     async def tasa(self) -> tuple[dict | None, list]:
